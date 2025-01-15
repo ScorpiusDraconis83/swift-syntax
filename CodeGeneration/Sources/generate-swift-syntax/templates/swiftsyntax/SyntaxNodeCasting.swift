@@ -14,75 +14,89 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SyntaxSupport
 
-@MemberBlockItemListBuilder
-func choiceNodeCastingMethods(for syntaxNodeKind: SyntaxNodeKind) -> MemberBlockItemListSyntax {
-  if syntaxNodeKind.isBase {
-    DeclSyntax(
-      """
-      /// Checks if the current syntax node can be cast to the type conforming to the ``\(syntaxNodeKind.protocolType)`` protocol.
-      ///
-      /// - Returns: `true` if the node can be cast, `false` otherwise.
-      public func `is`<S: \(syntaxNodeKind.protocolType)>(_ syntaxType: S.Type) -> Bool {
-        return self.as(syntaxType) != nil
-      }
-      """
-    )
+extension ChildNodeChoices.Choice {
+  @MemberBlockItemListBuilder
+  var castingMethods: MemberBlockItemListSyntax {
+    if self.isBase {
+      DeclSyntax(
+        """
+        /// Checks if the current syntax node can be cast to the type conforming to the ``\(self.protocolType)`` protocol.
+        ///
+        /// - Returns: `true` if the node can be cast, `false` otherwise.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func `is`(_ syntaxType: (some \(self.protocolType)).Type) -> Bool {
+          return self.as(syntaxType) != nil
+        }
+        """
+      )
 
-    DeclSyntax(
-      """
-      /// Attempts to cast the current syntax node to the type conforming to the ``\(syntaxNodeKind.protocolType)`` protocol.
-      ///
-      /// - Returns: An instance of the specialized type, or `nil` if the cast fails.
-      public func `as`<S: \(syntaxNodeKind.protocolType)>(_ syntaxType: S.Type) -> S? {
-        return S.init(self)
-      }
-      """
-    )
+      DeclSyntax(
+        """
+        /// Attempts to cast the current syntax node to the type conforming to the ``\(self.protocolType)`` protocol.
+        ///
+        /// - Returns: An instance of the specialized type, or `nil` if the cast fails.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func `as`<S: \(self.protocolType)>(_ syntaxType: S.Type) -> S? {
+          return S.init(self)
+        }
+        """
+      )
 
-    DeclSyntax(
-      """
-      /// Force-casts the current syntax node to the type conforming to the ``\(syntaxNodeKind.protocolType)`` protocol.
-      ///
-      /// - Returns: An instance of the specialized type.
-      /// - Warning: This function will crash if the cast is not possible. Use `as` to safely attempt a cast.
-      public func cast<S: \(syntaxNodeKind.protocolType)>(_ syntaxType: S.Type) -> S {
-        return self.as(S.self)!
-      }
-      """
-    )
-  } else {
-    DeclSyntax(
-      """
-      /// Checks if the current syntax node can be cast to ``\(syntaxNodeKind.syntaxType)``.
-      ///
-      /// - Returns: `true` if the node can be cast, `false` otherwise.
-      public func `is`(_ syntaxType: \(syntaxNodeKind.syntaxType).Type) -> Bool {
-        return self.as(syntaxType) != nil
-      }
-      """
-    )
+      DeclSyntax(
+        """
+        /// Force-casts the current syntax node to the type conforming to the ``\(self.protocolType)`` protocol.
+        ///
+        /// - Returns: An instance of the specialized type.
+        /// - Warning: This function will crash if the cast is not possible. Use `as` to safely attempt a cast.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func cast<S: \(self.protocolType)>(_ syntaxType: S.Type) -> S {
+          return self.as(S.self)!
+        }
+        """
+      )
+    } else {
+      DeclSyntax(
+        """
+        /// Checks if the current syntax node can be cast to \(raw: self.doccLink).
+        ///
+        /// - Returns: `true` if the node can be cast, `false` otherwise.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func `is`(_ syntaxType: \(self.syntaxType).Type) -> Bool {
+          return self.as(syntaxType) != nil
+        }
+        """
+      )
 
-    DeclSyntax(
-      """
-      /// Attempts to cast the current syntax node to ``\(syntaxNodeKind.syntaxType)``.
-      ///
-      /// - Returns: An instance of ``\(syntaxNodeKind.syntaxType)``, or `nil` if the cast fails.
-      public func `as`(_ syntaxType: \(syntaxNodeKind.syntaxType).Type) -> \(syntaxNodeKind.syntaxType)? {
-        return \(syntaxNodeKind.syntaxType).init(self)
-      }
-      """
-    )
+      DeclSyntax(
+        """
+        /// Attempts to cast the current syntax node to \(raw: self.doccLink).
+        ///
+        /// - Returns: An instance of \(raw: self.doccLink), or `nil` if the cast fails.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func `as`(_ syntaxType: \(self.syntaxType).Type) -> \(self.syntaxType)? {
+          return \(self.syntaxType).init(self)
+        }
+        """
+      )
 
-    DeclSyntax(
-      """
-      /// Force-casts the current syntax node to ``\(syntaxNodeKind.syntaxType)``.
-      ///
-      /// - Returns: An instance of ``\(syntaxNodeKind.syntaxType)``.
-      /// - Warning: This function will crash if the cast is not possible. Use `as` to safely attempt a cast.
-      public func cast(_ syntaxType: \(syntaxNodeKind.syntaxType).Type) -> \(syntaxNodeKind.syntaxType) {
-        return self.as(\(syntaxNodeKind.syntaxType).self)!
-      }
-      """
-    )
+      DeclSyntax(
+        """
+        /// Force-casts the current syntax node to \(raw: self.doccLink).
+        ///
+        /// - Returns: An instance of \(raw: self.doccLink).
+        /// - Warning: This function will crash if the cast is not possible. Use `as` to safely attempt a cast.
+        \(self.experimentalDocNote)\
+        \(self.apiAttributes)\
+        public func cast(_ syntaxType: \(self.syntaxType).Type) -> \(self.syntaxType) {
+          return self.as(\(self.syntaxType).self)!
+        }
+        """
+      )
+    }
   }
 }

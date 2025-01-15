@@ -42,43 +42,33 @@ option(SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26
        $<IF:$<AND:$<NOT:$<CONFIG:Debug>>,$<PLATFORM_ID:Darwin>>,YES,NO>)
 
 include(AddSwiftHostLibrary)
+include(SwiftCompilerCapability)
 
-# Ensure that we do not link the _StringProcessing module. But we can
-# only pass this flag for new-enough compilers that support it.
-file(WRITE "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift" "")
-execute_process(
-  COMMAND
-    "${CMAKE_Swift_COMPILER}"
-    -Xfrontend -disable-implicit-string-processing-module-import
-    -Xfrontend -parse-stdlib
-    -typecheck "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift"
-  OUTPUT_QUIET ERROR_QUIET
-  RESULT_VARIABLE
-    SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
-if (NOT SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
-  add_compile_options(
-    $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
-    $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
+# Don't link with 'string-processing' and 'backtracing'.
+swift_supports_implicit_module("string-processing" SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+swift_supports_implicit_module("backtracing" SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+endif()
+if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>")
+endif()
+
+if(NOT DEFINED Swift_COMPILER_PACKAGE_CMO_SUPPORT AND SWIFTSYNTAX_EMIT_MODULE)
+  swift_get_package_cmo_support(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+endif()
+if(NOT DEFINED SWIFTSYNTAX_PACKAGE_NAME)
+  set(SWIFTSYNTAX_PACKAGE_NAME "${SWIFT_MODULE_ABI_NAME_PREFIX}${PROJECT_NAME}")
 endif()
 
 # Determine the module triple.
 if("${SWIFT_HOST_MODULE_TRIPLE}" STREQUAL "")
-  # FIXME: This is a hack. It's all a hack. Windows isn't setting
-  # CMAKE_Swift_COMPILER_TARGET.
+  set(module_triple_command "${CMAKE_Swift_COMPILER}" -print-target-info)
   if(CMAKE_Swift_COMPILER_TARGET)
-    string(REGEX REPLACE "macosx[0-9]+([.][0-9]+)?" "macos" SWIFT_HOST_MODULE_TRIPLE
-      ${CMAKE_Swift_COMPILER_TARGET})
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-      set(SWIFT_HOST_MODULE_TRIPLE "x86_64-unknown-windows-msvc")
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
-      set(SWIFT_HOST_MODULE_TRIPLE "aarch64-unknown-windows-msvc")
-    else()
-      message(FATAL_ERROR "Unrecognized architecture for Windows host")
-    endif()
-  else()
-    message(FATAL_ERROR "Host module triple required")
+    list(APPEND module_triple_command -target ${CMAKE_Swift_COMPILER_TARGET})
   endif()
+  execute_process(COMMAND ${module_triple_command} OUTPUT_VARIABLE target_info_json)
+  string(JSON SWIFT_HOST_MODULE_TRIPLE GET "${target_info_json}" "target" "moduleTriple")
 endif()
 message(STATUS "Module triple: ${SWIFT_HOST_MODULE_TRIPLE}")
 
@@ -87,6 +77,10 @@ if (SWIFTSYNTAX_ENABLE_ASSERTIONS)
     $<$<COMPILE_LANGUAGE:Swift>:SWIFTSYNTAX_ENABLE_ASSERTIONS>
   )
 endif()
+
+add_compile_definitions(
+  $<$<COMPILE_LANGUAGE:Swift>:SWIFT_SYNTAX_BUILD_USING_CMAKE>
+)
 
 add_subdirectory(Sources)
 add_subdirectory(cmake/modules)

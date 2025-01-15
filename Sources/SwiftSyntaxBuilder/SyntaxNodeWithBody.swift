@@ -10,7 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+internal import SwiftParser
+#else
 import SwiftSyntax
+import SwiftParser
+#endif
 
 // MARK: - PartialSyntaxNode
 
@@ -65,8 +71,11 @@ public protocol HasTrailingCodeBlock: WithCodeBlockSyntax {
   init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax) rethrows
 }
 
-public extension HasTrailingCodeBlock where Self: StmtSyntaxProtocol {
-  init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax) throws {
+extension HasTrailingCodeBlock where Self: StmtSyntaxProtocol {
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax
+  ) throws {
     let stmt = StmtSyntax("\(header) {}")
     guard let castedStmt = stmt.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: stmt)
@@ -77,7 +86,10 @@ public extension HasTrailingCodeBlock where Self: StmtSyntaxProtocol {
 }
 
 extension CatchClauseSyntax: HasTrailingCodeBlock {
-  public init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax) rethrows {
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax
+  ) rethrows {
     self = CatchClauseSyntax("\(header) {}")
     self.body = try CodeBlockSyntax(statements: bodyBuilder())
   }
@@ -90,7 +102,7 @@ extension WhileStmtSyntax: HasTrailingCodeBlock {}
 
 // MARK: - WithOptionalCodeBlockSyntax
 
-public extension WithOptionalCodeBlockSyntax where Self: DeclSyntaxProtocol {
+extension WithOptionalCodeBlockSyntax where Self: DeclSyntaxProtocol {
   /// Constructs a syntax node where `header` builds the text of the node before the body in braces and `bodyBuilder` is used to build the node’s body.
   ///
   /// For example, you can construct
@@ -110,8 +122,26 @@ public extension WithOptionalCodeBlockSyntax where Self: DeclSyntaxProtocol {
   /// ```
   ///
   /// Throws an error if `header` defines a different node type than the type the initializer is called on. E.g. if calling `try FunctionDeclSyntax("init") {}`
-  init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax) throws {
-    let decl = DeclSyntax("\(header) {}")
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax
+  ) throws {
+    // If the type provides a custom `SyntaxParseable` implementation, use that. Otherwise construct it as a
+    // `DeclSyntax`.
+    // We cannot use normal string interpolation here because the conformance to `ExpressibleByStringInterpolation` is
+    // not implied by `SyntaxParsable` but generated for each type by
+    // `SyntaxExpressibleByStringInterpolationConformances.swift`. And we can’t use that protocol in the `as?` check
+    // because then the compiler complains that `parsableType` is not instantiable. So, manually do the same work that
+    // a string literal with interpolation segments would do.
+    let decl: DeclSyntax
+    var stringInterpolation = SyntaxStringInterpolation(literalCapacity: 1, interpolationCount: 1)
+    stringInterpolation.appendInterpolation(header)
+    stringInterpolation.appendLiteral(" {}")
+    if let parsableType = Self.self as? SyntaxParseable.Type {
+      decl = parsableType.init(stringInterpolation: stringInterpolation).cast(DeclSyntax.self)
+    } else {
+      decl = DeclSyntax(stringInterpolation: stringInterpolation)
+    }
     guard let castedDecl = decl.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: decl)
     }
@@ -146,12 +176,28 @@ public protocol HasTrailingMemberDeclBlock {
   /// ```
   ///
   /// Throws an error if `header` defines a different node type than the type the initializer is called on. E.g. if calling `try StructDeclSyntax("class MyClass") {}`
-  init(_ header: SyntaxNodeString, @MemberBlockItemListBuilder membersBuilder: () throws -> MemberBlockItemListSyntax) throws
+  init(
+    _ header: SyntaxNodeString,
+    @MemberBlockItemListBuilder membersBuilder: () throws -> MemberBlockItemListSyntax
+  ) throws
 }
 
-public extension HasTrailingMemberDeclBlock where Self: DeclSyntaxProtocol {
-  init(_ header: SyntaxNodeString, @MemberBlockItemListBuilder membersBuilder: () throws -> MemberBlockItemListSyntax) throws {
-    let decl = DeclSyntax("\(header) {}")
+extension HasTrailingMemberDeclBlock where Self: DeclSyntaxProtocol {
+  public init(
+    _ header: SyntaxNodeString,
+    @MemberBlockItemListBuilder membersBuilder: () throws -> MemberBlockItemListSyntax
+  ) throws {
+    // If the type provides a custom `SyntaxParseable` implementation, use that. Otherwise construct it as a
+    // `DeclSyntax`.
+    let decl: DeclSyntax
+    var stringInterpolation = SyntaxStringInterpolation(literalCapacity: 1, interpolationCount: 1)
+    stringInterpolation.appendInterpolation(header)
+    stringInterpolation.appendLiteral(" {}")
+    if let parsableType = Self.self as? SyntaxParseable.Type {
+      decl = parsableType.init(stringInterpolation: stringInterpolation).cast(DeclSyntax.self)
+    } else {
+      decl = DeclSyntax(stringInterpolation: stringInterpolation)
+    }
     guard let castedDecl = decl.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: decl)
     }
@@ -171,7 +217,7 @@ extension StructDeclSyntax: HasTrailingMemberDeclBlock {}
 // IfExprSyntax is a special scenario as we also have the `else` body or an if-else
 // So we cannot conform to `HasTrailingCodeBlock`
 
-public extension IfExprSyntax {
+extension IfExprSyntax {
   /// Constructs an `if` expression with an optional `else` block.
   ///
   /// `header` specifies the part of the `if` expression before the body’s first brace.
@@ -189,7 +235,7 @@ public extension IfExprSyntax {
   /// This function takes care of inserting the braces as well.
   ///
   /// Throws an error if `header` does not start an `if` expression. E.g. if calling `try IfExprSyntax("while true") {}`
-  init(
+  public init(
     _ header: SyntaxNodeString,
     @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax,
     @CodeBlockItemListBuilder `else` elseBuilder: () throws -> CodeBlockItemListSyntax? = { nil }
@@ -238,7 +284,11 @@ public extension IfExprSyntax {
   /// ```
   ///
   /// Throws an error if `header` does not start an `if` expression. E.g. if calling `try IfExprSyntax("while true", bodyBuilder: {}, elseIf: {})`
-  init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax, elseIf: IfExprSyntax) throws {
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder bodyBuilder: () throws -> CodeBlockItemListSyntax,
+    elseIf: IfExprSyntax
+  ) throws {
     let expr = ExprSyntax("\(header) {}")
     guard let ifExpr = expr.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: expr)
@@ -271,7 +321,10 @@ extension SwitchCaseSyntax {
   /// ```
   ///
   /// Throws an error if `header` does not start a switch case item. E.g. if calling `try SwitchCaseSyntax("func foo") {}`
-  public init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder statementsBuilder: () throws -> CodeBlockItemListSyntax) rethrows {
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder statementsBuilder: () throws -> CodeBlockItemListSyntax
+  ) rethrows {
     self = SwitchCaseSyntax("\(header)")
     self.statements = try statementsBuilder()
   }
@@ -281,7 +334,7 @@ extension SwitchCaseSyntax {
 // SwitchExprSyntax is a special scenario as it don't have body or members
 // So we cannot conform to `HasTrailingCodeBlock` or `HasTrailingMemberDeclBlock`
 
-public extension SwitchExprSyntax {
+extension SwitchExprSyntax {
   /// Constructs a `switch` expression where `header` builds the text before the opening `{` and `casesBuilder` can be used to build the case items.
   ///
   /// For example, to construct
@@ -305,7 +358,10 @@ public extension SwitchExprSyntax {
   /// ```
   ///
   /// Throws an error if `header` does not start a switch expression. E.g. if calling `try SwitchExprSyntax("if x < 42") {}`
-  init(_ header: SyntaxNodeString, @SwitchCaseListBuilder casesBuilder: () throws -> SwitchCaseListSyntax = { SwitchCaseListSyntax([]) }) throws {
+  public init(
+    _ header: SyntaxNodeString,
+    @SwitchCaseListBuilder casesBuilder: () throws -> SwitchCaseListSyntax = { SwitchCaseListSyntax([]) }
+  ) throws {
     let expr = ExprSyntax("\(header) {}")
     guard let switchExpr = expr.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: expr)
@@ -319,7 +375,7 @@ public extension SwitchExprSyntax {
 // VariableDeclSyntax is a special scenario as it don't have body or members
 // So we cannot conform to `HasTrailingCodeBlock` or `HasTrailingMemberDeclBlock`
 
-public extension VariableDeclSyntax {
+extension VariableDeclSyntax {
   /// Construct a variable with a single `get` accessor where `header` builds the text before the opening `{` and `accessor` builds the accessor body.
   ///
   /// For example, to construct
@@ -339,7 +395,10 @@ public extension VariableDeclSyntax {
   /// ```
   ///
   /// Throws an error if `header` does not start a variable declaration. E.g. if calling `try VariableDeclSyntax("func foo") {}`
-  init(_ header: SyntaxNodeString, @CodeBlockItemListBuilder accessor: () throws -> CodeBlockItemListSyntax) throws {
+  public init(
+    _ header: SyntaxNodeString,
+    @CodeBlockItemListBuilder accessor: () throws -> CodeBlockItemListSyntax
+  ) throws {
     let decl = DeclSyntax("\(header) {}")
     guard let castedDecl = decl.as(Self.self) else {
       throw SyntaxStringInterpolationInvalidNodeTypeError(expectedType: Self.self, actualNode: decl)

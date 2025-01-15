@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 protocol NominalTypeDeclarationTrait {
   associatedtype PrimaryOrGenerics
@@ -311,14 +315,17 @@ extension Parser {
             arena: self.arena
           )
         )
-      } while keepGoing != nil && self.hasProgressed(&loopProgress)
+      } while keepGoing != nil && !self.atInheritanceListTerminator() && self.hasProgressed(&loopProgress)
     }
 
     let unexpectedAfterInheritedTypeCollection: RawUnexpectedNodesSyntax?
 
     // If it is a Python style inheritance clause, then consume a right paren if there is one.
     if isPythonStyleInheritanceClause, let rightParen = self.consume(if: .rightParen) {
-      unexpectedAfterInheritedTypeCollection = RawUnexpectedNodesSyntax(elements: [RawSyntax(rightParen)], arena: self.arena)
+      unexpectedAfterInheritedTypeCollection = RawUnexpectedNodesSyntax(
+        [rightParen],
+        arena: self.arena
+      )
     } else {
       unexpectedAfterInheritedTypeCollection = nil
     }
@@ -330,6 +337,10 @@ extension Parser {
       unexpectedAfterInheritedTypeCollection,
       arena: self.arena
     )
+  }
+
+  mutating func atInheritanceListTerminator() -> Bool {
+    return self.experimentalFeatures.contains(.trailingComma) && (self.at(.leftBrace) || self.at(.keyword(.where)))
   }
 
   mutating func parsePrimaryAssociatedTypes() -> RawPrimaryAssociatedTypeClauseSyntax {

@@ -10,7 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import Foundation
+private import XCTest
+private import _SwiftSyntaxGenericTestSupport
+#else
+import Foundation
 import XCTest
+import _SwiftSyntaxGenericTestSupport
+#endif
 
 /// Asserts that the two strings are equal, providing Unix `diff`-style output if they are not.
 ///
@@ -28,19 +36,24 @@ public func assertStringsEqualWithDiff(
   _ expected: String,
   _ message: String = "",
   additionalInfo: @autoclosure () -> String? = nil,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
-  if actual == expected {
-    return
-  }
-  failStringsEqualWithDiff(
+  let location = TestFailureLocation(
+    fileID: "",  // Not used in the failure handler
+    filePath: file,
+    line: line,
+    column: 0  // Not used in the failure handler
+  )
+  return _SwiftSyntaxGenericTestSupport.assertStringsEqualWithDiff(
     actual,
     expected,
     message,
     additionalInfo: additionalInfo(),
-    file: file,
-    line: line
+    location: location,
+    failureHandler: {
+      XCTFail($0.message, file: $0.location.filePath, line: $0.location.line)
+    }
   )
 }
 
@@ -60,96 +73,26 @@ public func assertDataEqualWithDiff(
   _ expected: Data,
   _ message: String = "",
   additionalInfo: @autoclosure () -> String? = nil,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   if actual == expected {
     return
   }
 
-  // NOTE: Converting to `Stirng` here looses invalid UTF8 sequence difference,
-  // but at least we can see something is different.
-  failStringsEqualWithDiff(
-    String(decoding: actual, as: UTF8.self),
-    String(decoding: expected, as: UTF8.self),
+  let actualString = String(decoding: actual, as: UTF8.self)
+  let expectedString = String(decoding: expected, as: UTF8.self)
+
+  if actualString == expectedString {
+    XCTFail("Actual differs from expected data but underlying strings are equivalent", file: file, line: line)
+  }
+
+  assertStringsEqualWithDiff(
+    actualString,
+    expectedString,
     message,
     additionalInfo: additionalInfo(),
     file: file,
     line: line
   )
-}
-
-/// `XCTFail` with `diff`-style output.
-public func failStringsEqualWithDiff(
-  _ actual: String,
-  _ expected: String,
-  _ message: String = "",
-  additionalInfo: @autoclosure () -> String? = nil,
-  file: StaticString = #file,
-  line: UInt = #line
-) {
-  let stringComparison: String
-
-  // Use `CollectionDifference` on supported platforms to get `diff`-like line-based output. On
-  // older platforms, fall back to simple string comparison.
-  if #available(macOS 10.15, *) {
-    let actualLines = actual.components(separatedBy: .newlines)
-    let expectedLines = expected.components(separatedBy: .newlines)
-
-    let difference = actualLines.difference(from: expectedLines)
-
-    var result = ""
-
-    var insertions = [Int: String]()
-    var removals = [Int: String]()
-
-    for change in difference {
-      switch change {
-      case .insert(let offset, let element, _):
-        insertions[offset] = element
-      case .remove(let offset, let element, _):
-        removals[offset] = element
-      }
-    }
-
-    var expectedLine = 0
-    var actualLine = 0
-
-    while expectedLine < expectedLines.count || actualLine < actualLines.count {
-      if let removal = removals[expectedLine] {
-        result += "–\(removal)\n"
-        expectedLine += 1
-      } else if let insertion = insertions[actualLine] {
-        result += "+\(insertion)\n"
-        actualLine += 1
-      } else {
-        result += " \(expectedLines[expectedLine])\n"
-        expectedLine += 1
-        actualLine += 1
-      }
-    }
-
-    stringComparison = result
-  } else {
-    // Fall back to simple message on platforms that don't support CollectionDifference.
-    stringComparison = """
-      Expected:
-      \(expected)
-
-      Actual:
-      \(actual)
-      """
-  }
-
-  var fullMessage = """
-    \(message.isEmpty ? "Actual output does not match the expected" : message)
-    \(stringComparison)
-    """
-  if let additional = additionalInfo() {
-    fullMessage = """
-      \(fullMessage)
-      \(additional)
-      """
-  }
-  XCTFail(fullMessage, file: file, line: line)
 }

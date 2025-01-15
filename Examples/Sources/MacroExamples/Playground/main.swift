@@ -47,3 +47,15 @@ runMemberMacrosPlayground()
 // MARK: - Peer Macros
 
 runPeerMacrosPlayground()
+
+// MARK: - Accessor Macros
+
+#if canImport(SwiftUI)
+
+runEnvironmentValueAccessorMacroPlayground()
+
+#endif
+
+// MARK: - SourceLocationMacros
+
+runSourceLoctionMacrosPlayground()

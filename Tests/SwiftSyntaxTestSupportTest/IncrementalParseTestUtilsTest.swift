@@ -14,7 +14,7 @@ import SwiftSyntax
 import XCTest
 import _SwiftSyntaxTestSupport
 
-public class IncrementalParseUtilTest: XCTestCase {
+class IncrementalParseUtilTest: XCTestCase {
   public func testGetConcurrentEdits() {
     let source =
       """
@@ -32,17 +32,26 @@ public class IncrementalParseUtilTest: XCTestCase {
     XCTAssertEqual(
       concurrentEdits.edits,
       [
-        IncrementalEdit(offset: 0, length: 5, replacementLength: 6),
-        IncrementalEdit(offset: 27, length: 0, replacementLength: 12),
-        IncrementalEdit(offset: 35, length: 13, replacementLength: 0),
+        SourceEdit(
+          range: Range(position: AbsolutePosition(utf8Offset: 0), length: SourceLength(utf8Length: 5)),
+          replacement: "struct"
+        ),
+        SourceEdit(
+          range: Range(position: AbsolutePosition(utf8Offset: 27), length: SourceLength(utf8Length: 0)),
+          replacement: "let bar = 10"
+        ),
+        SourceEdit(
+          range: Range(position: AbsolutePosition(utf8Offset: 35), length: SourceLength(utf8Length: 13)),
+          replacement: ""
+        ),
       ]
     )
 
     let expectedSource =
       """
-      ?????? foo {
+      struct foo {
         init() {
-          ????????????
+          let bar = 10
         }
 
         
@@ -64,7 +73,10 @@ public class IncrementalParseUtilTest: XCTestCase {
     XCTAssertEqual(
       concurrentEdits.edits,
       [
-        IncrementalEdit(offset: 0, length: 25, replacementLength: 4)
+        SourceEdit(
+          range: Range(position: AbsolutePosition(utf8Offset: 0), length: SourceLength(utf8Length: 25)),
+          replacement: "🎉"
+        )
       ]
     )
   }
@@ -79,7 +91,10 @@ public class IncrementalParseUtilTest: XCTestCase {
     XCTAssertEqual(
       concurrentEdits.edits,
       [
-        IncrementalEdit(offset: 0, length: 1, replacementLength: 25)
+        SourceEdit(
+          range: Range(position: AbsolutePosition(utf8Offset: 0), length: SourceLength(utf8Length: 1)),
+          replacement: "👨‍👩‍👧‍👦"
+        )
       ]
     )
   }

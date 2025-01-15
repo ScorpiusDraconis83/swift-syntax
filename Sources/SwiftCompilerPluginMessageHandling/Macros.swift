@@ -10,17 +10,42 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftBasicFormat
+internal import SwiftDiagnostics
+internal import SwiftOperators
+internal import SwiftSyntax
+@_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) internal import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeature) internal import SwiftSyntaxMacros
+#else
 import SwiftBasicFormat
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
+@_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+#endif
 
-extension CompilerPluginMessageHandler {
+extension PluginProviderMessageHandler {
   /// Get concrete macro type from a pair of module name and type name.
   private func resolveMacro(_ ref: PluginMessage.MacroReference) throws -> Macro.Type {
     try provider.resolveMacro(moduleName: ref.moduleName, typeName: ref.typeName)
+  }
+
+  /// Resolve the lexical context
+  private static func resolveLexicalContext(
+    _ lexicalContext: [PluginMessage.Syntax]?,
+    sourceManager: SourceManager,
+    operatorTable: OperatorTable,
+    fallbackSyntax: some SyntaxProtocol
+  ) -> [Syntax] {
+    // If we weren't provided with a lexical context, retrieve it from the
+    // syntax node we were given. This is for dealing with older compilers.
+    guard let lexicalContext else {
+      return fallbackSyntax.allMacroLexicalContexts()
+    }
+
+    return lexicalContext.map { sourceManager.add($0, foldingWith: operatorTable) }
   }
 
   /// Expand `@freestainding(XXX)` macros.
@@ -28,13 +53,20 @@ extension CompilerPluginMessageHandler {
     macro: PluginMessage.MacroReference,
     macroRole pluginMacroRole: PluginMessage.MacroRole?,
     discriminator: String,
-    expandingSyntax: PluginMessage.Syntax
-  ) throws {
-    let sourceManager = SourceManager()
+    expandingSyntax: PluginMessage.Syntax,
+    lexicalContext: [PluginMessage.Syntax]?
+  ) -> PluginToHostMessage {
+    let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
     let syntax = sourceManager.add(expandingSyntax, foldingWith: .standardOperators)
 
     let context = PluginMacroExpansionContext(
       sourceManager: sourceManager,
+      lexicalContext: Self.resolveLexicalContext(
+        lexicalContext,
+        sourceManager: sourceManager,
+        operatorTable: .standardOperators,
+        fallbackSyntax: syntax
+      ),
       expansionDiscriminator: discriminator
     )
 
@@ -73,7 +105,7 @@ extension CompilerPluginMessageHandler {
       // TODO: Remove this  when all compilers have 'hasExpandMacroResult'.
       response = .expandFreestandingMacroResult(expandedSource: expandedSource, diagnostics: diagnostics)
     }
-    try self.sendMessage(response)
+    return response
   }
 
   /// Expand `@attached(XXX)` macros.
@@ -85,14 +117,10 @@ extension CompilerPluginMessageHandler {
     declSyntax: PluginMessage.Syntax,
     parentDeclSyntax: PluginMessage.Syntax?,
     extendedTypeSyntax: PluginMessage.Syntax?,
-    conformanceListSyntax: PluginMessage.Syntax?
-  ) throws {
-    let sourceManager = SourceManager()
-    let context = PluginMacroExpansionContext(
-      sourceManager: sourceManager,
-      expansionDiscriminator: discriminator
-    )
-
+    conformanceListSyntax: PluginMessage.Syntax?,
+    lexicalContext: [PluginMessage.Syntax]?
+  ) -> PluginToHostMessage {
+    let sourceManager = SourceManager(syntaxRegistry: syntaxRegistry)
     let attributeNode = sourceManager.add(
       attributeSyntax,
       foldingWith: .standardOperators
@@ -106,6 +134,17 @@ extension CompilerPluginMessageHandler {
       let placeholderStruct = sourceManager.add($0).cast(StructDeclSyntax.self)
       return placeholderStruct.inheritanceClause!.inheritedTypes
     }
+
+    let context = PluginMacroExpansionContext(
+      sourceManager: sourceManager,
+      lexicalContext: Self.resolveLexicalContext(
+        lexicalContext,
+        sourceManager: sourceManager,
+        operatorTable: .standardOperators,
+        fallbackSyntax: declarationNode
+      ),
+      expansionDiscriminator: discriminator
+    )
 
     // TODO: Make this a 'String?' and remove non-'hasExpandMacroResult' branches.
     let expandedSources: [String]?
@@ -124,12 +163,21 @@ extension CompilerPluginMessageHandler {
         in: context
       )
       if let expansions, hostCapability.hasExpandMacroResult {
+        let collapseIndentationWidth: Trivia?
+        switch macroDefinition.formatMode {
+        case .auto: collapseIndentationWidth = nil
+        case .disabled: collapseIndentationWidth = []
+        #if RESILIENT_LIBRARIES
+        @unknown default: fatalError()
+        #endif
+        }
         // Make a single element array by collapsing the results into a string.
         expandedSources = [
           SwiftSyntaxMacroExpansion.collapse(
             expansions: expansions,
             for: role,
-            attachedTo: declarationNode
+            attachedTo: declarationNode,
+            indentationWidth: collapseIndentationWidth
           )
         ]
       } else {
@@ -150,7 +198,7 @@ extension CompilerPluginMessageHandler {
     } else {
       response = .expandAttachedMacroResult(expandedSources: expandedSources, diagnostics: diagnostics)
     }
-    try self.sendMessage(response)
+    return response
   }
 }
 

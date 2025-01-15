@@ -25,9 +25,9 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       """
       // MARK: - \(node.kind.syntaxType)
 
-      /// Protocol to which all ``\(node.kind.syntaxType)`` nodes conform. 
+      /// Protocol to which all \(raw: node.kind.doccLink) nodes conform.
       ///
-      /// Extension point to add common methods to all ``\(node.kind.syntaxType)`` nodes.
+      /// Extension point to add common methods to all \(raw: node.kind.doccLink) nodes.
       ///
       ///  - Warning: Do not conform to this protocol yourself.
       \(node.apiAttributes())\
@@ -77,7 +77,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
           return self.as(S.self)!
         }
 
-        /// Checks if the current syntax node can be upcast to its base node type (``\#(node.kind.syntaxType)``).
+        /// Checks if the current syntax node can be upcast to its base node type (\#(raw: node.kind.doccLink)).
         ///
         /// - Returns: `true` since the node can always be upcast to its base node.
         @available(*, deprecated, message: "This cast will always succeed")
@@ -85,7 +85,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
           return true
         }
 
-        /// Attempts to upcast the current syntax node to its base node type (``\#(node.kind.syntaxType)``).
+        /// Attempts to upcast the current syntax node to its base node type (\#(raw: node.kind.doccLink)).
         ///
         /// - Returns: The base node created from the current syntax node, as the node can always be upcast to its base type.
         @available(*, deprecated, message: "Use `\#(node.kind.syntaxType).init` for upcasting")
@@ -93,7 +93,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
           return \#(node.kind.syntaxType)(self)
         }
 
-        /// Force-upcast the current syntax node to its base node type (``\#(node.kind.syntaxType)``).
+        /// Force-upcast the current syntax node to its base node type (\#(raw: node.kind.doccLink)).
         ///
         /// - Returns: The base node created from the current syntax node, as the node can always be upcast to its base type.
         @available(*, deprecated, message: "Use `\#(node.kind.syntaxType).init` for upcasting")
@@ -145,14 +145,14 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       """#
     )
 
-    try! ExtensionDeclSyntax("public extension Syntax") {
+    try! ExtensionDeclSyntax("extension Syntax") {
       DeclSyntax(
         """
         /// Check whether the non-type erased version of this syntax node conforms to
         /// \(node.kind.protocolType).
         ///
         ///  - Note:  This will incur an existential conversion.
-        func isProtocol(_: \(node.kind.protocolType).Protocol) -> Bool {
+        public func isProtocol(_: \(node.kind.protocolType).Protocol) -> Bool {
           return self.asProtocol(\(node.kind.protocolType).self) != nil
         }
         """
@@ -164,7 +164,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         /// \(node.kind.protocolType). Otherwise return nil.
         ///
         ///  - Note:  This will incur an existential conversion.
-        func asProtocol(_: \(node.kind.protocolType).Protocol) -> \(node.kind.protocolType)? {
+        public func asProtocol(_: \(node.kind.protocolType).Protocol) -> \(node.kind.protocolType)? {
           return self.asProtocol(SyntaxProtocol.self) as? \(node.kind.protocolType)
         }
         """
@@ -173,7 +173,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
     try! StructDeclSyntax(
       """
-      \(documentation)
+      \(documentation)\
       \(node.apiAttributes())\
       public struct \(node.kind.syntaxType): \(node.kind.protocolType), SyntaxHashable
       """
@@ -182,8 +182,8 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
       DeclSyntax(
         """
-        /// Create a ``\(node.kind.syntaxType)`` node from a specialized syntax node.
-        public init(_ syntax: some \(node.kind.protocolType)) {
+        /// Create a \(raw: node.kind.doccLink) node from a specialized syntax node.
+        public init(_ syntax: __shared some \(node.kind.protocolType)) {
           // We know this cast is going to succeed. Go through init(_: SyntaxData)
           // to do a sanity check and verify the kind matches in debug builds and get
           // maximum performance in release builds.
@@ -194,8 +194,8 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
       DeclSyntax(
         """
-        /// Create a ``\(node.kind.syntaxType)`` node from a specialized optional syntax node.
-        public init?(_ syntax: (some \(node.kind.protocolType))?) {
+        /// Create a \(raw: node.kind.doccLink) node from a specialized optional syntax node.
+        public init?(_ syntax: __shared (some \(node.kind.protocolType))?) {
           guard let syntax = syntax else { return nil }
           self.init(syntax)
         }
@@ -204,7 +204,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
       DeclSyntax(
         """
-        public init(fromProtocol syntax: \(node.kind.protocolType)) {
+        public init(fromProtocol syntax: __shared \(node.kind.protocolType)) {
           // We know this cast is going to succeed. Go through init(_: SyntaxData)
           // to do a sanity check and verify the kind matches in debug builds and get
           // maximum performance in release builds.
@@ -215,15 +215,15 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
       DeclSyntax(
         """
-        /// Create a ``\(node.kind.syntaxType)`` node from a specialized optional syntax node.
-        public init?(fromProtocol syntax: \(node.kind.protocolType)?) {
+        /// Create a \(raw: node.kind.doccLink) node from a specialized optional syntax node.
+        public init?(fromProtocol syntax: __shared \(node.kind.protocolType)?) {
           guard let syntax = syntax else { return nil }
           self.init(fromProtocol: syntax)
         }
         """
       )
 
-      try InitializerDeclSyntax("public init?(_ node: some SyntaxProtocol)") {
+      try InitializerDeclSyntax("public init?(_ node: __shared some SyntaxProtocol)") {
         try SwitchExprSyntax("switch node.raw.kind") {
           SwitchCaseListSyntax {
             SwitchCaseSyntax(
@@ -232,7 +232,7 @@ let syntaxBaseNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
                   for childNode in SYNTAX_NODES where childNode.base == node.kind {
                     SwitchCaseItemSyntax(
                       pattern: ExpressionPatternSyntax(
-                        expression: ExprSyntax(".\(childNode.varOrCaseName)")
+                        expression: ExprSyntax(".\(childNode.memberCallName)")
                       )
                     )
                   }
@@ -337,7 +337,7 @@ private func leafProtocolDecl(type: TypeSyntax, inheritedType: TypeSyntax) -> De
 private func leafProtocolExtension(type: TypeSyntax, inheritedType: TypeSyntax) -> DeclSyntax {
   DeclSyntax(
     #"""
-    public extension \#(type) {
+    extension \#(type) {
       /// Checks if the current leaf syntax node can be cast to a different specified type.
       ///
       /// - Returns: `false` since the leaf node cannot be cast to a different specified type.
@@ -345,7 +345,7 @@ private func leafProtocolExtension(type: TypeSyntax, inheritedType: TypeSyntax) 
       /// - Note: This method overloads the general `is` method and is marked as deprecated to produce a warning,
       ///         informing the user that the cast will always fail.
       @available(*, deprecated, message: "This cast will always fail")
-      func `is`<S: \#(inheritedType)>(_ syntaxType: S.Type) -> Bool {
+      public func `is`<S: \#(inheritedType)>(_ syntaxType: S.Type) -> Bool {
         return false
       }
 
@@ -356,7 +356,7 @@ private func leafProtocolExtension(type: TypeSyntax, inheritedType: TypeSyntax) 
       /// - Note: This method overloads the general `as` method and is marked as deprecated to produce a warning,
       ///         informing the user that the cast will always fail.
       @available(*, deprecated, message: "This cast will always fail")
-      func `as`<S: \#(inheritedType)>(_ syntaxType: S.Type) -> S? {
+      public func `as`<S: \#(inheritedType)>(_ syntaxType: S.Type) -> S? {
         return nil
       }
 
@@ -368,7 +368,7 @@ private func leafProtocolExtension(type: TypeSyntax, inheritedType: TypeSyntax) 
       ///         informing the user that the cast will always fail.
       /// - Warning: Invoking this method will lead to a fatal error.
       @available(*, deprecated, message: "This cast will always fail")
-      func cast<S: \#(inheritedType)>(_ syntaxType: S.Type) -> S {
+      public func cast<S: \#(inheritedType)>(_ syntaxType: S.Type) -> S {
         fatalError("\(Self.self) cannot be cast to \(S.self)")
       }
     }

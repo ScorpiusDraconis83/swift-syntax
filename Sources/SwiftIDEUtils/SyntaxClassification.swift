@@ -10,9 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
-public enum SyntaxClassification {
+public enum SyntaxClassification: Sendable {
   /// An attribute starting with an `@`.
   case attribute
   /// A block comment starting with `/**` and ending with `*/.

@@ -176,7 +176,6 @@ final class SubscriptingTests: ParserTestCase {
   func testSubscripting11() {
     assertParse(
       """
-      // FIXME: This test case does not belong in Parse/
       let y2 = Y2()
       _ = y2[0]
       """
@@ -187,9 +186,9 @@ final class SubscriptingTests: ParserTestCase {
     assertParse(
       """
       struct A0 {
-        subscript 1️⃣
+        subscript1️⃣ 
           i : 2️⃣Int3️⃣
-           -> Int 4️⃣{
+           -> Int4️⃣ 5️⃣{
           get {
             return stored
           }
@@ -204,7 +203,11 @@ final class SubscriptingTests: ParserTestCase {
         DiagnosticSpec(locationMarker: "2️⃣", message: "expected '(' to start function type", fixIts: ["insert '('"]),
         DiagnosticSpec(locationMarker: "3️⃣", message: "expected ')' in function type", fixIts: ["insert ')'"]),
         DiagnosticSpec(locationMarker: "4️⃣", message: "expected ')' to end parameter clause", fixIts: ["insert ')'"]),
-        DiagnosticSpec(locationMarker: "4️⃣", message: "expected '->' and return type in subscript", fixIts: ["insert '->' and return type"]),
+        DiagnosticSpec(
+          locationMarker: "5️⃣",
+          message: "expected '->' and return type in subscript",
+          fixIts: ["insert '->' and return type"]
+        ),
       ],
       fixedSource: """
         struct A0 {
@@ -228,7 +231,7 @@ final class SubscriptingTests: ParserTestCase {
       """
       // Parsing errors
       struct A0 {
-        subscript 1️⃣-> Int {
+        subscript1️⃣ -> Int {
           return 1
         }
       }
@@ -520,7 +523,7 @@ final class SubscriptingTests: ParserTestCase {
     assertParse(
       """
       struct A11 {
-        subscript 1️⃣x y : 2️⃣Int 3️⃣-> Int 4️⃣{
+        subscript1️⃣ x y : 2️⃣Int3️⃣ -> Int4️⃣ 5️⃣{
           return 0
         }
       }
@@ -530,7 +533,11 @@ final class SubscriptingTests: ParserTestCase {
         DiagnosticSpec(locationMarker: "2️⃣", message: "expected '(' to start function type", fixIts: ["insert '('"]),
         DiagnosticSpec(locationMarker: "3️⃣", message: "expected ')' in function type", fixIts: ["insert ')'"]),
         DiagnosticSpec(locationMarker: "4️⃣", message: "expected ')' to end parameter clause", fixIts: ["insert ')'"]),
-        DiagnosticSpec(locationMarker: "4️⃣", message: "expected '->' and return type in subscript", fixIts: ["insert '->' and return type"]),
+        DiagnosticSpec(
+          locationMarker: "5️⃣",
+          message: "expected '->' and return type in subscript",
+          fixIts: ["insert '->' and return type"]
+        ),
       ],
       fixedSource: """
         struct A11 {

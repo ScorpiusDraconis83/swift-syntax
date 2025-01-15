@@ -15,16 +15,27 @@ import SwiftSyntaxBuilder
 import SyntaxSupport
 import Utils
 
-func tokenCaseMatch(_ caseName: TokenSyntax, experimentalFeature: ExperimentalFeature?) -> SwitchCaseSyntax {
-  let whereClause =
-    experimentalFeature.map {
-      "where experimentalFeatures.contains(.\($0.token))"
-    } ?? ""
-  return "case TokenSpec(.\(caseName))\(raw: whereClause): self = .\(caseName)"
+func tokenCaseMatch(
+  _ enumCaseCallName: TokenSyntax,
+  experimentalFeature: ExperimentalFeature?
+) -> SwitchCaseSyntax {
+  var whereClause = ""
+  if let feature = experimentalFeature {
+    whereClause += "where experimentalFeatures.contains(.\(feature.token))"
+  }
+  return "case TokenSpec(.\(enumCaseCallName))\(raw: whereClause): self = .\(enumCaseCallName)"
 }
 
 let parserTokenSpecSetFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) public import SwiftSyntax
+    #else
+    @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+    #endif
+    """
+  )
 
   for layoutNode in SYNTAX_NODES.compactMap(\.layoutNode) {
     for child in layoutNode.children {
@@ -42,29 +53,42 @@ let parserTokenSpecSetFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
                 DeclSyntax(
                   """
                   \(keyword.spec.apiAttributes)\
-                  case \(keyword.spec.varOrCaseName.backtickedIfNeeded)
+                  case \(keyword.spec.enumCaseDeclName)
                   """
                 )
               case .token(let token):
-                DeclSyntax("case \(token.spec.varOrCaseName)")
+                DeclSyntax("case \(token.spec.enumCaseDeclName)")
               }
             }
 
-            try InitializerDeclSyntax("init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures)") {
+            try InitializerDeclSyntax(
+              "init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures)"
+            ) {
               try SwitchExprSyntax("switch PrepareForKeywordMatch(lexeme)") {
                 for choice in choices {
                   switch choice {
                   case .keyword(let keyword):
                     tokenCaseMatch(
-                      keyword.spec.varOrCaseName,
+                      keyword.spec.enumCaseCallName,
                       experimentalFeature: keyword.spec.experimentalFeature
                     )
                   case .token(let token):
                     tokenCaseMatch(
-                      token.spec.varOrCaseName,
+                      token.spec.enumCaseCallName,
                       experimentalFeature: token.spec.experimentalFeature
                     )
                   }
+                }
+                SwitchCaseSyntax("default: return nil")
+              }
+            }
+
+            try InitializerDeclSyntax("public init?(token: TokenSyntax)") {
+              try SwitchExprSyntax("switch token") {
+                for choice in choices {
+                  SwitchCaseSyntax(
+                    "case TokenSpec(.\(choice.enumCaseCallName)): self = .\(choice.enumCaseCallName)"
+                  )
                 }
                 SwitchCaseSyntax("default: return nil")
               }
@@ -75,10 +99,10 @@ let parserTokenSpecSetFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
                 for choice in choices {
                   switch choice {
                   case .keyword(let keyword):
-                    let caseName = keyword.spec.varOrCaseName
+                    let caseName = keyword.spec.enumCaseCallName
                     SwitchCaseSyntax("case .\(caseName): return .keyword(.\(caseName))")
                   case .token(let token):
-                    let caseName = token.spec.varOrCaseName
+                    let caseName = token.spec.enumCaseCallName
                     SwitchCaseSyntax("case .\(caseName): return .\(caseName)")
                   }
                 }
@@ -98,10 +122,10 @@ let parserTokenSpecSetFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
                 for choice in choices {
                   switch choice {
                   case .keyword(let keyword):
-                    let caseName = keyword.spec.varOrCaseName
+                    let caseName = keyword.spec.enumCaseCallName
                     SwitchCaseSyntax("case .\(caseName): return .keyword(.\(caseName))")
                   case .token(let token):
-                    let caseName = token.spec.varOrCaseName
+                    let caseName = token.spec.enumCaseCallName
                     if token.spec.text != nil {
                       SwitchCaseSyntax("case .\(caseName): return .\(caseName)Token()")
                     } else {

@@ -29,7 +29,7 @@ fileprivate func cannedStructDecl() -> StructDeclSyntax {
   )
 }
 
-public class SyntaxCreationTests: XCTestCase {
+class SyntaxCreationTests: XCTestCase {
 
   public func testGenerated() {
 
@@ -110,7 +110,9 @@ public class SyntaxCreationTests: XCTestCase {
   public func testFunctionCallSyntaxBuilder() {
     let string = StringLiteralExprSyntax(
       openingQuote: .stringQuoteToken(),
-      segments: StringLiteralSegmentListSyntax([.stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))]),
+      segments: StringLiteralSegmentListSyntax([
+        .stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))
+      ]),
       closingQuote: .stringQuoteToken()
     )
     let printID = DeclReferenceExprSyntax(baseName: .identifier("print"))
@@ -154,7 +156,9 @@ public class SyntaxCreationTests: XCTestCase {
     let string = StringLiteralExprSyntax(
       openingPounds: nil,
       openingQuote: .stringQuoteToken(),
-      segments: StringLiteralSegmentListSyntax([.stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))]),
+      segments: StringLiteralSegmentListSyntax([
+        .stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))
+      ]),
       closingQuote: .stringQuoteToken(),
       closingPounds: nil
     )
@@ -175,7 +179,9 @@ public class SyntaxCreationTests: XCTestCase {
 
     let call3 = FunctionCallExprSyntax(
       calledExpression: printID,
-      arguments: LabeledExprListSyntax([arg])
+      leftParen: nil,
+      arguments: LabeledExprListSyntax([arg]),
+      rightParen: nil
     )
     XCTAssertNil(call3.leftParen)
     XCTAssertNil(call3.rightParen)
@@ -184,7 +190,9 @@ public class SyntaxCreationTests: XCTestCase {
   public func testMakeStringLiteralExpr() {
     let expr = StringLiteralExprSyntax(
       openingQuote: .stringQuoteToken(leadingTrivia: [.lineComment("// hello"), .newlines(1)]),
-      segments: StringLiteralSegmentListSyntax([.stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))]),
+      segments: StringLiteralSegmentListSyntax([
+        .stringSegment(StringSegmentSyntax(content: .stringSegment("Hello, world!")))
+      ]),
       closingQuote: .stringQuoteToken()
     )
     let expected = """

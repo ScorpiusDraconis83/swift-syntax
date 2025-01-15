@@ -16,16 +16,36 @@ import SyntaxSupport
 import Utils
 
 let syntaxExpressibleByStringInterpolationConformancesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    internal import SwiftSyntax
+    #else
+    import SwiftSyntax
+    #endif
+    """
+  )
 
-  for node in SYNTAX_NODES where node.parserFunction != nil {
-    DeclSyntax("extension \(node.kind.syntaxType): SyntaxExpressibleByStringInterpolation {}")
+  let typesExpressibleByStringInterpolation =
+    SYNTAX_NODES
+    .filter { $0.parserFunction != nil }
+    .map { $0.kind.syntaxType }
+    // `SyntaxParsable` conformance for collection nodes is hand-written.
+    + [
+      "AccessorDeclListSyntax",
+      "AttributeListSyntax",
+      "CodeBlockItemListSyntax",
+      "MemberBlockItemListSyntax",
+    ]
+
+  for type in typesExpressibleByStringInterpolation {
+    DeclSyntax("extension \(type): SyntaxExpressibleByStringInterpolation {}")
+    DeclSyntax(
+      """
+      #if compiler(>=6)
+      extension \(type): Swift.ExpressibleByStringInterpolation {}
+      #endif
+      """
+    )
   }
-
-  // `SyntaxParsable` conformance for collection nodes is hand-written.
-  // We also need to hand-write the corresponding `SyntaxExpressibleByStringInterpolation` conformances.
-  DeclSyntax("extension AccessorDeclListSyntax: SyntaxExpressibleByStringInterpolation {}")
-  DeclSyntax("extension AttributeListSyntax: SyntaxExpressibleByStringInterpolation {}")
-  DeclSyntax("extension CodeBlockItemListSyntax: SyntaxExpressibleByStringInterpolation {}")
-  DeclSyntax("extension MemberBlockItemListSyntax: SyntaxExpressibleByStringInterpolation {}")
 }

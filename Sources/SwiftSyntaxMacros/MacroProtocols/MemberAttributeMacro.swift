@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Describes a macro that can add attributes to the members inside the
 /// declaration it's attached to.

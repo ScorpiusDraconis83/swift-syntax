@@ -91,11 +91,11 @@ final class GenericDisambiguationTests: ParserTestCase {
       """,
       substructure: GenericArgumentListSyntax([
         GenericArgumentSyntax(
-          argument: IdentifierTypeSyntax(name: .identifier("b")),
+          argument: .type(TypeSyntax(IdentifierTypeSyntax(name: .identifier("b")))),
           trailingComma: .commaToken()
         ),
         GenericArgumentSyntax(
-          argument: IdentifierTypeSyntax(name: .identifier("c"))
+          argument: .type(TypeSyntax(IdentifierTypeSyntax(name: .identifier("c"))))
         ),
       ])
     )
@@ -109,11 +109,11 @@ final class GenericDisambiguationTests: ParserTestCase {
       """,
       substructure: GenericArgumentListSyntax([
         GenericArgumentSyntax(
-          argument: IdentifierTypeSyntax(name: .identifier("b")),
+          argument: .type(TypeSyntax(IdentifierTypeSyntax(name: .identifier("b")))),
           trailingComma: .commaToken()
         ),
         GenericArgumentSyntax(
-          argument: IdentifierTypeSyntax(name: .identifier("c"))
+          argument: .type(TypeSyntax(IdentifierTypeSyntax(name: .identifier("c"))))
         ),
       ])
     )
@@ -213,11 +213,14 @@ final class GenericDisambiguationTests: ParserTestCase {
   }
 
   func testGenericDisambiguation15() {
-    // TODO: parse empty <> list
     assertParse(
       """
       A<>.c()
-      """
+      """,
+      substructure: PostfixOperatorExprSyntax(
+        expression: ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("A"))),
+        operator: .postfixOperator("<>")
+      )
     )
   }
 

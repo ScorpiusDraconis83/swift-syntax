@@ -10,6 +10,7 @@ add_swift_syntax_library(SwiftSyntaxBuilder
   ConvenienceInitializers.swift
   DeclSyntaxParseable.swift
   Indenter.swift
+  ListBuilder.swift
   ResultBuilderExtensions.swift
   SwiftSyntaxBuilderCompatibility.swift
   Syntax+StringInterpolation.swift
@@ -27,7 +28,7 @@ add_swift_syntax_library(SwiftSyntaxBuilder
 
 # Don't depend on OSLog when we are building for the compiler.
 # In that case we don't want any dependencies on the SDK.
-target_compile_options(SwiftSyntaxBuilder PRIVATE
+target_compile_options(${SWIFTSYNTAX_TARGET_NAMESPACE}SwiftSyntaxBuilder PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-D;SWIFTSYNTAX_NO_OSLOG_DEPENDENCY>)
 
 target_link_swift_syntax_libraries(SwiftSyntaxBuilder PUBLIC

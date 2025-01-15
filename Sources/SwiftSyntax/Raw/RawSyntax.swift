@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_spi(RawSyntax) public typealias RawSyntaxBuffer = UnsafeBufferPointer<RawSyntax?>
-typealias RawTriviaPieceBuffer = UnsafeBufferPointer<RawTriviaPiece>
+@_spi(RawSyntax) public typealias RawSyntaxBuffer = SyntaxArenaAllocatedBufferPointer<RawSyntax?>
+
+typealias RawTriviaPieceBuffer = SyntaxArenaAllocatedBufferPointer<RawTriviaPiece>
 
 fileprivate extension SyntaxKind {
   /// Whether this node kind should be considered as `hasError` for purposes of `RecursiveRawSyntaxFlags`.
@@ -20,7 +21,7 @@ fileprivate extension SyntaxKind {
   }
 }
 
-struct RecursiveRawSyntaxFlags: OptionSet {
+struct RecursiveRawSyntaxFlags: OptionSet, Sendable {
   let rawValue: UInt8
 
   /// Whether the tree contained by this layout has any
@@ -36,8 +37,10 @@ struct RecursiveRawSyntaxFlags: OptionSet {
 }
 
 /// Node data for RawSyntax tree. Tagged union plus common data.
-internal struct RawSyntaxData {
-  internal enum Payload {
+internal struct RawSyntaxData: Sendable {
+  internal enum Payload: Sendable {
+    /// - Important: A raw syntax node for a parsed token must always be allocated in a `ParsingSyntaxArena` so we can
+    ///   parse the trivia in the token.
     case parsedToken(ParsedToken)
     case materializedToken(MaterializedToken)
     case layout(Layout)
@@ -47,7 +50,7 @@ internal struct RawSyntaxData {
   ///
   /// The RawSyntax's `arena` must have a valid trivia parsing function to
   /// lazily materialize the leading/trailing trivia pieces.
-  struct ParsedToken {
+  struct ParsedToken: Sendable {
     var tokenKind: RawTokenKind
 
     /// Whole text of this token including leading/trailing trivia.
@@ -86,7 +89,13 @@ internal struct RawSyntaxData {
       }
     }
 
-    init(tokenKind: RawTokenKind, wholeText: SyntaxText, textRange: Range<SyntaxText.Index>, presence: SourcePresence, tokenDiagnostic: TokenDiagnostic?) {
+    init(
+      tokenKind: RawTokenKind,
+      wholeText: SyntaxText,
+      textRange: Range<SyntaxText.Index>,
+      presence: SourcePresence,
+      tokenDiagnostic: TokenDiagnostic?
+    ) {
       self.tokenKind = tokenKind
       self.wholeText = wholeText
       self.textRange = textRange
@@ -97,7 +106,7 @@ internal struct RawSyntaxData {
   }
 
   /// Token typically created with `TokenSyntax.<someToken>`.
-  struct MaterializedToken {
+  struct MaterializedToken: Sendable {
     var tokenKind: RawTokenKind
     var tokenText: SyntaxText
     var triviaPieces: RawTriviaPieceBuffer
@@ -150,7 +159,7 @@ internal struct RawSyntaxData {
   }
 
   /// Layout node including collections.
-  struct Layout {
+  struct Layout: Sendable {
     var kind: SyntaxKind
     var layout: RawSyntaxBuffer
     var byteLength: Int
@@ -188,30 +197,29 @@ extension RawSyntaxData.MaterializedToken {
 /// have no notion of identity and only provide structure to the tree. They
 /// are immutable and can be freely shared between syntax nodes.
 @_spi(RawSyntax)
-public struct RawSyntax {
+public struct RawSyntax: Sendable {
 
   /// Pointer to the actual data which resides in a SyntaxArena.
-  var pointer: UnsafePointer<RawSyntaxData>
-  init(pointer: UnsafePointer<RawSyntaxData>) {
+  var pointer: SyntaxArenaAllocatedPointer<RawSyntaxData>
+  init(pointer: SyntaxArenaAllocatedPointer<RawSyntaxData>) {
     self.pointer = pointer
   }
 
   init(arena: __shared SyntaxArena, payload: RawSyntaxData.Payload) {
     let arenaRef = SyntaxArenaRef(arena)
-    self.init(pointer: arena.intern(RawSyntaxData(payload: payload, arenaReference: arenaRef)))
+    let data = RawSyntaxData(
+      payload: payload,
+      arenaReference: arenaRef
+    )
+    self.init(pointer: SyntaxArenaAllocatedPointer(arena.intern(data)))
   }
 
   var rawData: RawSyntaxData {
-    unsafeAddress { pointer }
+    @_transparent unsafeAddress { pointer.pointer }
   }
 
   internal var arenaReference: SyntaxArenaRef {
     rawData.arenaReference
-  }
-
-  @_spi(RawSyntax)
-  public var arena: SyntaxArena {
-    rawData.arenaReference.value
   }
 
   internal var payload: RawSyntaxData.Payload {
@@ -302,7 +310,8 @@ extension RawSyntax {
   /// - Parameters:
   ///   - leadingTrivia: The trivia to attach.
   ///   - arena: SyntaxArena to the result node data resides.
-  func withLeadingTrivia(_ leadingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
+  @_spi(RawSyntax)
+  public func withLeadingTrivia(_ leadingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
     switch view {
     case .token(let tokenView):
       return .makeMaterializedToken(
@@ -328,7 +337,8 @@ extension RawSyntax {
   /// - Parameters:
   ///   - trailingTrivia: The trivia to attach.
   ///   - arena: SyntaxArena to the result node data resides.
-  func withTrailingTrivia(_ trailingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
+  @_spi(RawSyntax)
+  public func withTrailingTrivia(_ trailingTrivia: Trivia, arena: SyntaxArena) -> RawSyntax? {
     switch view {
     case .token(let tokenView):
       return .makeMaterializedToken(
@@ -350,29 +360,24 @@ extension RawSyntax {
   }
 }
 
-extension RawSyntax {
-  @_spi(RawSyntax)
-  public func toOpaque() -> UnsafeRawPointer {
-    UnsafeRawPointer(pointer)
-  }
-
-  @_spi(RawSyntax)
-  public static func fromOpaque(_ pointer: UnsafeRawPointer) -> RawSyntax {
-    Self(pointer: pointer.assumingMemoryBound(to: RawSyntaxData.self))
-  }
-}
-
 extension RawTriviaPiece {
-  func withSyntaxText(body: (SyntaxText) throws -> Void) rethrows {
+  /// Call `body` with the syntax text of this trivia piece.
+  ///
+  /// If `isEphemeral` is `true`, the ``SyntaxText`` argument is only guaranteed
+  /// to be valid within the call.
+  func withSyntaxText(body: (SyntaxText, _ isEphemeral: Bool) throws -> Void) rethrows {
     if let syntaxText = storedText {
-      try body(syntaxText)
+      try body(syntaxText, /*isEphemeral*/ false)
       return
     }
 
     var description = ""
     write(to: &description)
     try description.withUTF8 { buffer in
-      try body(SyntaxText(baseAddress: buffer.baseAddress, count: buffer.count))
+      try body(
+        SyntaxText(baseAddress: buffer.baseAddress, count: buffer.count),
+        /*isEphemeral*/ true
+      )
     }
   }
 }
@@ -384,21 +389,21 @@ extension RawSyntax {
   /// Unlike `description`, this provides a source-accurate representation
   /// even in the presence of malformed UTF-8 in the input source.
   ///
-  /// The ``SyntaxText`` arguments passed to the visitor are only guaranteed
-  /// to be valid within that call. It is unsafe to escape the `SyntaxValue`
-  /// values outside of the closure.
-  public func withEachSyntaxText(body: (SyntaxText) throws -> Void) rethrows {
+  /// If `isEphemeral` is `true`, the ``SyntaxText`` arguments passed to the
+  /// visitor are only guaranteed to be valid within that call. Otherwise, they
+  /// are valid as long as the raw syntax is alive.
+  public func withEachSyntaxText(body: (SyntaxText, _ isEphemeral: Bool) throws -> Void) rethrows {
     switch rawData.payload {
     case .parsedToken(let dat):
       if dat.presence == .present {
-        try body(dat.wholeText)
+        try body(dat.wholeText, /*isEphemeral*/ false)
       }
     case .materializedToken(let dat):
       if dat.presence == .present {
         for p in dat.leadingTrivia {
           try p.withSyntaxText(body: body)
         }
-        try body(dat.tokenText)
+        try body(dat.tokenText, /*isEphemeral*/ false)
         for p in dat.trailingTrivia {
           try p.withSyntaxText(body: body)
         }
@@ -414,9 +419,20 @@ extension RawSyntax {
   /// source even in the presence of invalid UTF-8.
   public var syntaxTextBytes: [UInt8] {
     var result: [UInt8] = []
-    withEachSyntaxText { syntaxText in
-      result.append(contentsOf: syntaxText)
+    var buf: SyntaxText = ""
+    withEachSyntaxText { syntaxText, isEphemeral in
+      if isEphemeral {
+        result.append(contentsOf: buf)
+        result.append(contentsOf: syntaxText)
+        buf = ""
+      } else if let base = buf.baseAddress, base + buf.count == syntaxText.baseAddress {
+        buf = SyntaxText(baseAddress: base, count: buf.count + syntaxText.count)
+      } else {
+        result.append(contentsOf: buf)
+        buf = syntaxText
+      }
     }
+    result.append(contentsOf: buf)
     return result
   }
 }
@@ -555,15 +571,11 @@ extension RawSyntax {
     textRange: Range<SyntaxText.Index>,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared SyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) -> RawSyntax {
     assert(
       arena.contains(text: wholeText),
       "token text must be managed by the arena"
-    )
-    assert(
-      arena is ParsingSyntaxArena || textRange == wholeText.indices,
-      "arena must be able to parse trivia"
     )
     let payload = RawSyntaxData.ParsedToken(
       tokenKind: kind,
@@ -572,7 +584,10 @@ extension RawSyntax {
       presence: presence,
       tokenDiagnostic: tokenDiagnostic
     )
-    precondition(kind != .keyword || Keyword(payload.tokenText) != nil, "If kind is keyword, the text must be a known token kind")
+    precondition(
+      kind != .keyword || Keyword(payload.tokenText) != nil,
+      "If kind is keyword, the text must be a known token kind"
+    )
     return RawSyntax(arena: arena, payload: .parsedToken(payload))
   }
 
@@ -649,7 +664,7 @@ extension RawSyntax {
     return .materializedToken(
       kind: kind,
       text: text,
-      triviaPieces: RawTriviaPieceBuffer(triviaBuffer),
+      triviaPieces: RawTriviaPieceBuffer(UnsafeBufferPointer(triviaBuffer)),
       numLeadingTrivia: numericCast(leadingTriviaPieceCount),
       byteLength: numericCast(byteLength),
       presence: presence,
@@ -711,7 +726,7 @@ extension RawSyntax {
     return .materializedToken(
       kind: rawKind,
       text: rawKind.defaultText ?? "",
-      triviaPieces: .init(start: nil, count: 0),
+      triviaPieces: RawTriviaPieceBuffer(),
       numLeadingTrivia: 0,
       byteLength: 0,
       presence: .missing,
@@ -792,7 +807,7 @@ extension RawSyntax {
     }
     return .layout(
       kind: kind,
-      layout: RawSyntaxBuffer(layoutBuffer),
+      layout: RawSyntaxBuffer(UnsafeBufferPointer(layoutBuffer)),
       byteLength: byteLength,
       descendantCount: descendantCount,
       recursiveFlags: recursiveFlags,
@@ -810,7 +825,7 @@ extension RawSyntax {
     }
     return .layout(
       kind: kind,
-      layout: .init(start: nil, count: 0),
+      layout: RawSyntaxBuffer(),
       byteLength: 0,
       descendantCount: 0,
       recursiveFlags: recursiveFlags,
@@ -831,13 +846,19 @@ extension RawSyntax {
         // Find the index of the first non-empty node so we can attach the trivia to it.
         let idx = layout.firstIndex(where: { $0 != nil && ($0!.isToken || $0!.totalNodes > 1) })
       {
-        layout[idx] = layout[idx]!.withLeadingTrivia(leadingTrivia + (layout[idx]?.formLeadingTrivia() ?? []), arena: arena)
+        layout[idx] = layout[idx]!.withLeadingTrivia(
+          leadingTrivia + (layout[idx]?.formLeadingTrivia() ?? []),
+          arena: arena
+        )
       }
       if let trailingTrivia = trailingTrivia,
         // Find the index of the first non-empty node so we can attach the trivia to it.
         let idx = layout.lastIndex(where: { $0 != nil && ($0!.isToken || $0!.totalNodes > 1) })
       {
-        layout[idx] = layout[idx]!.withTrailingTrivia((layout[idx]?.formTrailingTrivia() ?? []) + trailingTrivia, arena: arena)
+        layout[idx] = layout[idx]!.withTrailingTrivia(
+          (layout[idx]?.formTrailingTrivia() ?? []) + trailingTrivia,
+          arena: arena
+        )
       }
       return .makeLayout(kind: kind, from: layout, arena: arena)
     }
@@ -931,11 +952,11 @@ extension RawSyntax {
 }
 
 extension RawSyntax: Identifiable {
-  public struct ID: Hashable {
+  public struct ID: Hashable, @unchecked Sendable {
     /// The pointer to the start of the `RawSyntax` node.
-    private var pointer: UnsafeRawPointer
+    fileprivate var pointer: UnsafeRawPointer
     fileprivate init(_ raw: RawSyntax) {
-      self.pointer = UnsafeRawPointer(raw.pointer)
+      self.pointer = raw.pointer.unsafeRawPointer
     }
   }
 

@@ -17,10 +17,38 @@ public enum ExperimentalFeature: String, CaseIterable {
   case thenStatements
   case doExpressions
   case nonescapableTypes
-  case transferringArgsAndResults
+  case trailingComma
+  case coroutineAccessors
+  case valueGenerics
+  case abiAttribute
+  case unsafeExpression
 
-  /// The name of the feature, which is used in the doc comment.
+  /// The name of the feature as it is written in the compiler's `Features.def` file.
   public var featureName: String {
+    switch self {
+    case .referenceBindings:
+      return "ReferenceBindings"
+    case .thenStatements:
+      return "ThenStatements"
+    case .doExpressions:
+      return "DoExpressions"
+    case .nonescapableTypes:
+      return "NonescapableTypes"
+    case .trailingComma:
+      return "TrailingComma"
+    case .coroutineAccessors:
+      return "CoroutineAccessors"
+    case .valueGenerics:
+      return "ValueGenerics"
+    case .abiAttribute:
+      return "ABIAttribute"
+    case .unsafeExpression:
+      return "WarnUnsafe"
+    }
+  }
+
+  /// A brief description of the feature that is used in the doc comment.
+  public var documentationDescription: String {
     switch self {
     case .referenceBindings:
       return "reference bindings"
@@ -29,9 +57,17 @@ public enum ExperimentalFeature: String, CaseIterable {
     case .doExpressions:
       return "'do' expressions"
     case .nonescapableTypes:
-      return "NonEscableTypes"
-    case .transferringArgsAndResults:
-      return "TransferringArgsAndResults"
+      return "non-escapable types"
+    case .trailingComma:
+      return "trailing commas"
+    case .coroutineAccessors:
+      return "coroutine accessors"
+    case .valueGenerics:
+      return "value generics"
+    case .abiAttribute:
+      return "@abi attribute"
+    case .unsafeExpression:
+      return "'unsafe' expression"
     }
   }
 

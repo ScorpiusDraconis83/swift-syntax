@@ -84,7 +84,9 @@ extension Unicode.Scalar {
     // N1518: Recommendations for extended identifier characters for C and C++
     // Proposed Annex X.2: Ranges of characters disallowed initially
     let c = self.value
-    if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF) || (c >= 0xFE20 && c <= 0xFE2F)) {
+    if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF)
+      || (c >= 0xFE20 && c <= 0xFE2F))
+    {
       return false
     }
 
@@ -97,21 +99,8 @@ extension Unicode.Scalar {
     // ASCII operator chars.
     if self.value < 0x80 {
       switch UInt8(self.value) {
-      case UInt8(ascii: "/"),
-        UInt8(ascii: "="),
-        UInt8(ascii: "-"),
-        UInt8(ascii: "+"),
-        UInt8(ascii: "*"),
-        UInt8(ascii: "%"),
-        UInt8(ascii: "<"),
-        UInt8(ascii: ">"),
-        UInt8(ascii: "!"),
-        UInt8(ascii: "&"),
-        UInt8(ascii: "|"),
-        UInt8(ascii: "^"),
-        UInt8(ascii: "~"),
-        UInt8(ascii: "."),
-        UInt8(ascii: "?"):
+      case "/", "=", "-", "+", "*", "%", "<",
+        ">", "!", "&", "|", "^", "~", ".", "?":
         return true
       default:
         return false
@@ -156,12 +145,6 @@ extension Unicode.Scalar {
     // including and above the DEL character U+7F.
     return self.value >= 0x20 && self.value < 0x7F
   }
-
-  var isStartOfUTF8Character: Bool {
-    // RFC 2279: The octet values FE and FF never appear.
-    // RFC 3629: The octet values C0, C1, F5 to FF never appear.
-    return self.value <= 0x80 || (self.value >= 0xC2 && self.value < 0xF5)
-  }
 }
 
 extension Unicode.Scalar {
@@ -179,19 +162,24 @@ extension Unicode.Scalar {
       return Unicode.Scalar(curByte)
     }
 
-    // Read the number of high bits set, which indicates the number of bytes in
-    // the character.
-    let encodedBytes = (~(UInt32(curByte) << 24)).leadingZeroBitCount
-
-    // If this is 0b10XXXXXX, then it is a continuation character.
-    if encodedBytes == 1 || !Unicode.Scalar(curByte).isStartOfUTF8Character {
+    // If this is not the start of a UTF8 character,
+    // then it is either a continuation byte or an invalid UTF8 code point.
+    if !curByte.isStartOfUTF8Character {
       // Skip until we get the start of another character.  This is guaranteed to
       // at least stop at the nul at the end of the buffer.
-      while let peeked = peek(), !Unicode.Scalar(peeked).isStartOfUTF8Character {
+      while let peeked = peek(), !peeked.isStartOfUTF8Character {
         _ = advance()
       }
       return nil
     }
+
+    // Read the number of high bits set, which indicates the number of bytes in
+    // the character.
+    let encodedBytes = (~curByte).leadingZeroBitCount
+    // We have a multi-byte UTF-8 scalar.
+    // Single-byte UTF-8 scalars are handled at the start of the function by checking `curByte < 0x80`.
+    // `isStartOfUTF8Character` guaranteed that the `curByte` has 2 to 4 leading ones.
+    precondition(encodedBytes >= 2 && encodedBytes <= 4)
 
     // Drop the high bits indicating the # bytes of the result.
     var charValue = UInt32(curByte << encodedBytes) >> encodedBytes
@@ -211,11 +199,6 @@ extension Unicode.Scalar {
       charValue <<= 6
       charValue |= UInt32(curByte & 0x3F)
       _ = advance()
-    }
-
-    // UTF-16 surrogate pair values are not valid code points.
-    if (charValue >= 0xD800 && charValue <= 0xDFFF) {
-      return nil
     }
 
     // If we got here, we read the appropriate number of accumulated bytes.
@@ -250,5 +233,32 @@ extension Unicode.Scalar {
     }
 
     return self.lexing(advance: advance, peek: peek)
+  }
+}
+
+extension UInt8 {
+  var isStartOfUTF8Character: Bool {
+    // RFC 2279: The octet values FE and FF never appear.
+    // RFC 3629: The octet values C0, C1, F5 to FF never appear.
+    return self < 0x80 || (self >= 0xC2 && self < 0xF5)
+  }
+}
+
+/// Allows direct comparisons between UInt8 and double quoted literals.
+extension UInt8? {
+  /// Equality operator
+  @_transparent
+  static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+  /// Inequality operator
+  @_transparent
+  static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+  /// Used in switch statements
+  @_transparent
+  static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
   }
 }

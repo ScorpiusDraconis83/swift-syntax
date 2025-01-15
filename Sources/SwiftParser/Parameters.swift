@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 // MARK: - Traits
 
@@ -125,7 +129,7 @@ extension Parser {
 
     let defaultValue: RawInitializerClauseSyntax?
     if self.at(.equal) || self.atContextualPunctuator("==") {
-      defaultValue = self.parseDefaultArgument()
+      defaultValue = self.parseInitializerClause()
     } else {
       defaultValue = nil
     }
@@ -156,10 +160,23 @@ extension Parser {
     let misplacedSpecifiers = parseMisplacedSpecifiers()
 
     let names = self.parseParameterNames()
-    let colon = self.consume(if: .colon)
+    var colon = self.consume(if: .colon)
+    // try to parse the type regardless of the presence of the preceding colon
+    // to tackle any unnamed parameter or missing colon
+    // e.g. [X], (:[X]) or (x [X])
+    let canParseType = withLookahead { $0.canParseType() }
     let type: RawTypeSyntax?
-    if colon != nil {
+    if canParseType {
       type = self.parseType(misplacedSpecifiers: misplacedSpecifiers)
+      if colon == nil {
+        // mark the preceding colon as missing if the type is present
+        // e.g. [X] or (x [X])
+        colon = missingToken(.colon)
+      }
+    } else if colon != nil {
+      // mark the type as missing if the preceding colon is present
+      // e.g. (:) or (_:)
+      type = RawTypeSyntax(RawMissingTypeSyntax(arena: self.arena))
     } else {
       type = nil
     }
@@ -204,7 +221,12 @@ extension Parser {
         type = self.parseType(misplacedSpecifiers: misplacedSpecifiers)
       }
     } else {
-      names = ParameterNames(unexpectedBeforeFirstName: nil, firstName: nil, unexpectedBeforeSecondName: nil, secondName: nil)
+      names = ParameterNames(
+        unexpectedBeforeFirstName: nil,
+        firstName: nil,
+        unexpectedBeforeSecondName: nil,
+        secondName: nil
+      )
       unexpectedBeforeColon = nil
       colon = nil
       type = self.parseType(misplacedSpecifiers: misplacedSpecifiers)
@@ -212,7 +234,7 @@ extension Parser {
 
     let defaultValue: RawInitializerClauseSyntax?
     if self.at(.equal) || self.atContextualPunctuator("==") {
-      defaultValue = self.parseDefaultArgument()
+      defaultValue = self.parseInitializerClause()
     } else {
       defaultValue = nil
     }
@@ -241,15 +263,13 @@ extension Parser {
   mutating func parseParameterModifiers(isClosure: Bool) -> RawDeclModifierListSyntax {
     var elements = [RawDeclModifierSyntax]()
     var loopProgress = LoopProgressCondition()
-    MODIFIER_LOOP: while self.hasProgressed(&loopProgress) {
-      switch self.at(anyIn: ParameterModifier.self) {
-      case (._const, let handle)?:
-        elements.append(RawDeclModifierSyntax(name: self.eat(handle), detail: nil, arena: self.arena))
-      case (.isolated, let handle)? where self.withLookahead({ !$0.startsParameterName(isClosure: isClosure, allowMisplacedSpecifierRecovery: false) }):
-        elements.append(RawDeclModifierSyntax(name: self.eat(handle), detail: nil, arena: self.arena))
-      default:
-        break MODIFIER_LOOP
+    while self.hasProgressed(&loopProgress) {
+      guard let match = self.at(anyIn: ParameterModifier.self),
+        !withLookahead({ $0.startsParameterName(isClosure: isClosure, allowMisplacedSpecifierRecovery: false) })
+      else {
+        break
       }
+      elements.append(RawDeclModifierSyntax(name: self.eat(match.handle), detail: nil, arena: self.arena))
     }
     if elements.isEmpty {
       return self.emptyCollection(RawDeclModifierListSyntax.self)
@@ -261,7 +281,9 @@ extension Parser {
   mutating func parseMisplacedSpecifiers() -> [RawTokenSyntax] {
     var misplacedSpecifiers: [RawTokenSyntax] = []
     if self.withLookahead({ !$0.startsParameterName(isClosure: false, allowMisplacedSpecifierRecovery: false) }) {
-      while canHaveParameterSpecifier, let specifier = self.consume(ifAnyIn: TypeSpecifier.self) {
+      while canHaveParameterSpecifier,
+        let specifier = self.consume(ifAnyIn: SimpleTypeSpecifierSyntax.SpecifierOptions.self)
+      {
         misplacedSpecifiers.append(specifier)
       }
     }

@@ -16,24 +16,36 @@ import SyntaxSupport
 import Utils
 
 let renamedChildrenBuilderCompatibilityFile = try! SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    public import SwiftSyntax
+    #else
+    import SwiftSyntax
+    #endif
+    """
+  )
 
-  for layoutNode in SYNTAX_NODES.compactMap(\.layoutNode).filter({ $0.children.hasDeprecatedChild }) {
-    if let convenienceInit = try layoutNode.createConvenienceBuilderInitializer(useDeprecatedChildName: true) {
-      let deprecatedNames = layoutNode.children
-        .filter { !$0.isUnexpectedNodes && $0.hasDeprecatedName }
-        .compactMap { $0.varOrCaseName.description }
-        .joined(separator: ", ")
+  for layoutNode in SYNTAX_NODES.compactMap(\.layoutNode).filter({ !$0.childHistory.isEmpty }) {
+    let deprecatedMembers = SYNTAX_COMPATIBILITY_LAYER.deprecatedMembers(for: layoutNode)
 
-      DeclSyntax(
-        """
-        extension \(layoutNode.type.syntaxBaseName) {
-        @available(*, deprecated, message: "Use an initializer with \(raw: deprecatedNames) argument(s).")
-        @_disfavoredOverload
-        \(convenienceInit)
-        }
-        """
-      )
+    for signature in deprecatedMembers.inits {
+      if let convenienceInit = try signature.createConvenienceBuilderInitializer() {
+        let deprecatedNames = layoutNode.children
+          .filter { !$0.isUnexpectedNodes && !signature.children.contains($0) }
+          .compactMap { $0.identifier.description }
+          .joined(separator: ", ")
+
+        DeclSyntax(
+          """
+          extension \(layoutNode.type.syntaxBaseName) {
+          @available(*, deprecated, message: "Use an initializer with \(raw: deprecatedNames) argument(s).")
+          @_disfavoredOverload
+          \(convenienceInit)
+          }
+          """
+        )
+      }
     }
   }
 }

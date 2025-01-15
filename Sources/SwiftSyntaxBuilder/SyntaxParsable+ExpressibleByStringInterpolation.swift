@@ -10,6 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftDiagnostics
+public import SwiftParser
+internal import SwiftParserDiagnostics
+internal import SwiftSyntax
+// Don't introduce a dependency on OSLog when building SwiftSyntax using CMake
+// for the compiler.
+#if canImport(os) && !SWIFTSYNTAX_NO_OSLOG_DEPENDENCY
+private import os
+#endif
+
+#else
 import SwiftDiagnostics
 import SwiftParser
 import SwiftParserDiagnostics
@@ -17,11 +29,18 @@ import SwiftSyntax
 
 // Don't introduce a dependency on OSLog when building SwiftSyntax using CMake
 // for the compiler.
-#if canImport(OSLog) && !SWIFTSYNTAX_NO_OSLOG_DEPENDENCY
-import OSLog
+#if canImport(os) && !SWIFTSYNTAX_NO_OSLOG_DEPENDENCY
+import os
+#endif
 #endif
 
+/// Only set from `withStringInterpolationParsingErrorsSuppressed`, which is only intended for testing purposes that are
+/// single-threaded.
+#if swift(>=6)
+fileprivate nonisolated(unsafe) var suppressStringInterpolationParsingErrors = false
+#else
 fileprivate var suppressStringInterpolationParsingErrors = false
+#endif
 
 /// Run the body, disabling any runtime warnings about syntax error in string
 /// interpolation inside the body.
@@ -71,8 +90,6 @@ extension SyntaxParseable {
   public init(stringInterpolation: SyntaxStringInterpolation) {
     self = stringInterpolation.sourceText.withUnsafeBufferPointer { buffer in
       var parser = Parser(buffer)
-      // FIXME: When the parser supports incremental parsing, put the
-      // interpolatedSyntaxNodes in so we don't have to parse them again.
       let result = Self.parse(from: &parser)
       return result
     }

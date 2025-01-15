@@ -10,12 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Types conforming to this protocol represent note messages that can be
 /// shown to the client.
 /// The messages should describe what the note is pointing at.
-public protocol NoteMessage {
+public protocol NoteMessage: Sendable {
   /// The message that should be displayed in the client.
   var message: String { get }
 
@@ -31,7 +35,7 @@ extension NoteMessage {
 }
 
 /// A note that points to another node that's relevant for a Diagnostic.
-public struct Note: CustomDebugStringConvertible {
+public struct Note: CustomDebugStringConvertible, Sendable {
   /// The node whose location the node is pointing.
   public let node: Syntax
 

@@ -15,7 +15,7 @@ import SwiftSyntaxBuilder
 import XCTest
 import _SwiftSyntaxTestSupport
 
-public class SyntaxVisitorTests: XCTestCase {
+class SyntaxVisitorTests: XCTestCase {
   /// The syntax tree of the following source file
   /// ```swift
   /// func foo() {
@@ -71,7 +71,9 @@ public class SyntaxVisitorTests: XCTestCase {
                     item: CodeBlockItemSyntax.Item(
                       FunctionDeclSyntax(
                         modifiers: DeclModifierListSyntax([
-                          DeclModifierSyntax(name: .keyword(.public, leadingTrivia: [.newlines(1), .spaces(2)], trailingTrivia: .space))
+                          DeclModifierSyntax(
+                            name: .keyword(.public, leadingTrivia: [.newlines(1), .spaces(2)], trailingTrivia: .space)
+                          )
                         ]),
                         funcKeyword: .keyword(.func, trailingTrivia: .space),
                         name: .identifier("foo"),
@@ -88,7 +90,11 @@ public class SyntaxVisitorTests: XCTestCase {
                             CodeBlockItemSyntax(
                               item: CodeBlockItemSyntax.Item(
                                 FunctionDeclSyntax(
-                                  funcKeyword: .keyword(.func, leadingTrivia: [.newlines(1), .spaces(4)], trailingTrivia: .space),
+                                  funcKeyword: .keyword(
+                                    .func,
+                                    leadingTrivia: [.newlines(1), .spaces(4)],
+                                    trailingTrivia: .space
+                                  ),
                                   name: .identifier("foo"),
                                   signature: FunctionSignatureSyntax(
                                     parameterClause: FunctionParameterClauseSyntax(

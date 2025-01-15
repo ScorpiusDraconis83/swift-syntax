@@ -20,7 +20,7 @@ fileprivate func assertPresumedSourceLocation(
   inspectionItemFilter: (CodeBlockItemSyntax.Item) -> (some SyntaxProtocol)? = { $0.as(VariableDeclSyntax.self) },
   presumedFile: String,
   presumedLine: Int,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   let converter = SourceLocationConverter(fileName: "input.swift", tree: source)
@@ -36,9 +36,9 @@ fileprivate func assertPresumedSourceLocation(
 
 final class SourceLocationConverterTests: XCTestCase {
   func testInvalidUtf8() {
-    let eofToken = withExtendedLifetime(SyntaxArena()) { arena in
+    let eofToken = withExtendedLifetime(ParsingSyntaxArena(parseTriviaFunction: dummyParseToken)) { arena in
       let leadingTriviaText = [UInt8(0xfd)].withUnsafeBufferPointer { buf in
-        arena.intern(SyntaxText(buffer: buf))
+        arena.intern(SyntaxText(buffer: SyntaxArenaAllocatedBufferPointer(buf)))
       }
 
       let nodeWithInvalidUtf8 = RawTokenSyntax(
@@ -174,11 +174,39 @@ final class SourceLocationConverterTests: XCTestCase {
     )
   }
 
+  func testMultiLineDirective() {
+    assertPresumedSourceLocation(
+      #"""
+      #sourceLocation(
+        file: "input.swift",
+        line: 10
+      )
+
+      let a = 2
+      """#,
+      presumedFile: "input.swift",
+      presumedLine: 11
+    )
+  }
+
+  func testDirectiveWithTrailingBlockComment() {
+    assertPresumedSourceLocation(
+      #"""
+      #sourceLocation(file: "input.swift", line: 10) /*
+        comment
+      */
+
+      let a = 2
+      """#,
+      presumedFile: "input.swift",
+      presumedLine: 13
+    )
+  }
   func testMultiLineStringLiteralAsFilename() {
     // FIXME: The current parser handles this fine but it’s a really bogus filename.
     // We ignore the directive because the multi-line string literal contains multiple segments.
     // We should probably justs disallow multi-line string literals for the `file` argument.
-    // cf https://github.com/apple/swift-syntax/issues/1831
+    // cf https://github.com/swiftlang/swift-syntax/issues/1831
     assertPresumedSourceLocation(
       #"""
       #sourceLocation(file: """

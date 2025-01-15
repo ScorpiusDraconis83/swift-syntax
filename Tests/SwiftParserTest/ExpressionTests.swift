@@ -58,6 +58,18 @@ final class ExpressionTests: ParserTestCase {
       }
       """
     )
+
+    assertParse(
+      """
+      func f(x:[Void])
+      {
+        var y:[[Void]] = x.map { [$0] }
+        {
+          $0.reserveCapacity(1)
+        } (&y[0])
+      }
+      """
+    )
   }
 
   func testTrailingClosures() {
@@ -218,8 +230,9 @@ final class ExpressionTests: ParserTestCase {
 
     assertParse(
       #"""
-      \String?.!.count.?
-      """#
+      \String?.!.count1️⃣.?
+      """#,
+      diagnostics: [DiagnosticSpec(message: "extraneous code '.?' at top level")]
     )
 
     assertParse(
@@ -230,8 +243,9 @@ final class ExpressionTests: ParserTestCase {
 
     assertParse(
       #"""
-      \Optional.?!?!?!?.??!
-      """#
+      \Optional.?!?!?!?1️⃣.??!
+      """#,
+      diagnostics: [DiagnosticSpec(message: "extraneous code '.??!' at top level")]
     )
 
     assertParse(
@@ -239,6 +253,147 @@ final class ExpressionTests: ParserTestCase {
       _ = distinctUntilChanged(\ .?.status)
       _ = distinctUntilChanged(\.?.status)
       """#
+    )
+  }
+
+  func testKeyPathSubscript() {
+    assertParse(
+      #"\Foo.Type.[2]"#,
+      substructure: KeyPathExprSyntax(
+        root: TypeSyntax(
+          MetatypeTypeSyntax(baseType: TypeSyntax("Foo"), metatypeSpecifier: .keyword(.Type))
+        ),
+        components: KeyPathComponentListSyntax([
+          KeyPathComponentSyntax(
+            period: .periodToken(),
+            component: KeyPathComponentSyntax.Component(
+              KeyPathSubscriptComponentSyntax(
+                arguments: LabeledExprListSyntax([LabeledExprSyntax(expression: ExprSyntax("2"))])
+              )
+            )
+          )
+        ])
+      )
+    )
+
+    assertParse(
+      #"\Foo.Bar.[2]"#,
+      substructure: KeyPathExprSyntax(
+        root: TypeSyntax("Foo"),
+        components: KeyPathComponentListSyntax([
+          KeyPathComponentSyntax(
+            period: .periodToken(),
+            component: KeyPathComponentSyntax.Component(
+              KeyPathPropertyComponentSyntax(declName: DeclReferenceExprSyntax(baseName: .identifier("Bar")))
+            )
+          ),
+          KeyPathComponentSyntax(
+            period: .periodToken(),
+            component: KeyPathComponentSyntax.Component(
+              KeyPathSubscriptComponentSyntax(
+                arguments: LabeledExprListSyntax([LabeledExprSyntax(expression: ExprSyntax("2"))])
+              )
+            )
+          ),
+        ])
+      )
+    )
+
+    assertParse(
+      #"\Foo.Bar.[2].1️⃣[1]"#,
+      diagnostics: [
+        DiagnosticSpec(message: "expected identifier in key path property component", fixIts: ["insert identifier"])
+      ],
+      fixedSource: #"\Foo.Bar.[2].<#identifier#>[1]"#
+    )
+
+    assertParse(
+      #"\Foo.Bar.?.1️⃣[1]"#,
+      diagnostics: [
+        DiagnosticSpec(message: "expected identifier in key path property component", fixIts: ["insert identifier"])
+      ],
+      fixedSource: #"\Foo.Bar.?.<#identifier#>[1]"#
+    )
+  }
+
+  func testChainedOptionalUnwrapsWithDot() {
+    assertParse(
+      #"\T.?1️⃣.!"#,
+      diagnostics: [DiagnosticSpec(message: "extraneous code '.!' at top level")]
+    )
+  }
+
+  func testChainedOptionalUnwrapsAfterSubscript() {
+    assertParse(
+      #"\T.abc[2]1️⃣.?"#,
+      diagnostics: [DiagnosticSpec(message: "extraneous code '.?' at top level")]
+    )
+  }
+
+  func testKeyPathFollowedByOperator() {
+    // The following is valid Swift. Make sure we parse it as such.
+    //
+    // struct Foo {
+    //   var bar: Int?
+    // }
+    //
+    // infix operator .?.
+    //
+    // func .?.(_ x: AnyKeyPath, _ a: Int) {}
+    //
+    // var blah = 2
+    // \Foo?.?.bar.?.blah
+    // \Foo?.?.?.blah
+
+    assertParse(
+      #"\Foo?.?.bar.?.blah"#,
+      substructure: SequenceExprSyntax(
+        elements: ExprListSyntax([
+          ExprSyntax(
+            KeyPathExprSyntax(
+              root: TypeSyntax("Foo?"),
+              components: [
+                KeyPathComponentSyntax(
+                  period: .periodToken(),
+                  component: .optional(
+                    KeyPathOptionalComponentSyntax(questionOrExclamationMark: .postfixQuestionMarkToken())
+                  )
+                ),
+                KeyPathComponentSyntax(
+                  period: .periodToken(),
+                  component: .property(
+                    KeyPathPropertyComponentSyntax(declName: DeclReferenceExprSyntax(baseName: "bar"))
+                  )
+                ),
+              ]
+            )
+          ),
+          ExprSyntax(BinaryOperatorExprSyntax(operator: .binaryOperator(".?."))),
+          ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("blah"))),
+        ])
+      )
+    )
+    assertParse(
+      #"\Foo?.?.?.blah"#,
+      substructure: SequenceExprSyntax(
+        elements: ExprListSyntax([
+          ExprSyntax(
+            KeyPathExprSyntax(
+              root: TypeSyntax("Foo?"),
+              components: [
+                KeyPathComponentSyntax(
+                  period: .periodToken(),
+                  component: .optional(
+                    KeyPathOptionalComponentSyntax(questionOrExclamationMark: .postfixQuestionMarkToken())
+                  )
+                )
+              ]
+            )
+          ),
+          ExprSyntax(BinaryOperatorExprSyntax(operator: .binaryOperator(".?."))),
+          ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("blah"))),
+        ])
+      )
     )
   }
 
@@ -271,7 +426,7 @@ final class ExpressionTests: ParserTestCase {
 
       assertParse(
         "\\\(rootType).y",
-        ExprSyntax.parse,
+        { ExprSyntax.parse(from: &$0) },
         substructure: KeyPathExprSyntax(
           root: TypeSyntax.parse(from: &parser),
           components: KeyPathComponentListSyntax([
@@ -626,7 +781,10 @@ final class ExpressionTests: ParserTestCase {
       """1️⃣"""
       """##,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal closing delimiter must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal closing delimiter must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: ##"""
         """
@@ -833,7 +991,10 @@ final class ExpressionTests: ParserTestCase {
     assertParse(
       "foo ? 11️⃣",
       diagnostics: [
-        DiagnosticSpec(message: "expected ':' and expression after '? ...' in ternary expression", fixIts: ["insert ':' and expression"])
+        DiagnosticSpec(
+          message: "expected ':' and expression after '? ...' in ternary expression",
+          fixIts: ["insert ':' and expression"]
+        )
       ],
       fixedSource: """
         foo ? 1 : <#expression#>
@@ -1011,7 +1172,11 @@ final class ExpressionTests: ParserTestCase {
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected pattern in variable", fixIts: ["insert pattern"]),
         DiagnosticSpec(locationMarker: "2️⃣", message: "expected type in function type", fixIts: ["insert type"]),
         DiagnosticSpec(locationMarker: "2️⃣", message: "unexpected code '..' in function type"),
-        DiagnosticSpec(locationMarker: "3️⃣", message: "expected return type in function type", fixIts: ["insert return type"]),
+        DiagnosticSpec(
+          locationMarker: "3️⃣",
+          message: "expected return type in function type",
+          fixIts: ["insert return type"]
+        ),
       ],
       fixedSource: """
         let <#pattern#>:(<#type#>..)-> <#type#>
@@ -1045,6 +1210,38 @@ final class ExpressionTests: ParserTestCase {
     assertParse("use(_borrow msg)")
     assertParse("_borrow msg")
     assertParse("let b = (_borrow self).buffer")
+    assertParse("borrow msg")
+    assertParse("use(borrow msg)")
+    assertParse("borrow(msg)")
+    assertParse("borrow (msg)")
+  }
+
+  func testBorrowNameFunctionCallStructure1() {
+    assertParse(
+      """
+      borrow(msg)
+      """,
+      substructure: FunctionCallExprSyntax(
+        calledExpression: DeclReferenceExprSyntax(baseName: .identifier("borrow")),
+        leftParen: .leftParenToken(),
+        arguments: LabeledExprListSyntax([LabeledExprSyntax(expression: ExprSyntax("msg"))]),
+        rightParen: .rightParenToken()
+      )
+    )
+  }
+
+  func testBorrowNameFunctionCallStructure2() {
+    assertParse(
+      """
+      borrow (msg)
+      """,
+      substructure: FunctionCallExprSyntax(
+        calledExpression: DeclReferenceExprSyntax(baseName: .identifier("borrow")),
+        leftParen: .leftParenToken(),
+        arguments: LabeledExprListSyntax([LabeledExprSyntax(expression: ExprSyntax("msg"))]),
+        rightParen: .rightParenToken()
+      )
+    )
   }
 
   func testCodeCompletionExpressions() {
@@ -1232,7 +1429,9 @@ final class ExpressionTests: ParserTestCase {
         openingQuote: .multilineStringQuoteToken(leadingTrivia: .spaces(2), trailingTrivia: .newline),
         segments: StringLiteralSegmentListSyntax([
           .stringSegment(StringSegmentSyntax(content: .stringSegment("line 1\n", leadingTrivia: .spaces(2)))),
-          .stringSegment(StringSegmentSyntax(content: .stringSegment("line 2", leadingTrivia: .spaces(2), trailingTrivia: .newline))),
+          .stringSegment(
+            StringSegmentSyntax(content: .stringSegment("line 2", leadingTrivia: .spaces(2), trailingTrivia: .newline))
+          ),
         ]),
         closingQuote: .multilineStringQuoteToken(leadingTrivia: .spaces(2))
 
@@ -1251,9 +1450,17 @@ final class ExpressionTests: ParserTestCase {
         openingQuote: .multilineStringQuoteToken(leadingTrivia: .spaces(2), trailingTrivia: .newline),
         segments: StringLiteralSegmentListSyntax([
           .stringSegment(
-            StringSegmentSyntax(content: .stringSegment("line 1 ", leadingTrivia: .spaces(2), trailingTrivia: [.backslashes(1), .newlines(1)]))
+            StringSegmentSyntax(
+              content: .stringSegment(
+                "line 1 ",
+                leadingTrivia: .spaces(2),
+                trailingTrivia: [.backslashes(1), .newlines(1)]
+              )
+            )
           ),
-          .stringSegment(StringSegmentSyntax(content: .stringSegment("line 2", leadingTrivia: .spaces(2), trailingTrivia: .newline))),
+          .stringSegment(
+            StringSegmentSyntax(content: .stringSegment("line 2", leadingTrivia: .spaces(2), trailingTrivia: .newline))
+          ),
         ]),
         closingQuote: .multilineStringQuoteToken(leadingTrivia: .spaces(2))
 
@@ -1274,8 +1481,15 @@ final class ExpressionTests: ParserTestCase {
           .stringSegment(StringSegmentSyntax(content: .stringSegment("line 1\n", leadingTrivia: .spaces(2)))),
           .stringSegment(
             StringSegmentSyntax(
-              UnexpectedNodesSyntax([Syntax(TokenSyntax.stringSegment("  line 2 ", trailingTrivia: [.backslashes(1), .newlines(1)]))]),
-              content: .stringSegment("line 2 ", leadingTrivia: .spaces(2), trailingTrivia: .newline, presence: .missing)
+              UnexpectedNodesSyntax([
+                Syntax(TokenSyntax.stringSegment("  line 2 ", trailingTrivia: [.backslashes(1), .newlines(1)]))
+              ]),
+              content: .stringSegment(
+                "line 2 ",
+                leadingTrivia: .spaces(2),
+                trailingTrivia: .newline,
+                presence: .missing
+              )
             )
           ),
         ]),
@@ -1283,7 +1497,10 @@ final class ExpressionTests: ParserTestCase {
 
       ),
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
           """
@@ -1321,7 +1538,11 @@ final class ExpressionTests: ParserTestCase {
         segments: StringLiteralSegmentListSyntax([
           .stringSegment(StringSegmentSyntax(content: .stringSegment("line 1\n", leadingTrivia: [.spaces(2)]))),
           .stringSegment(StringSegmentSyntax(content: .stringSegment("\n"))),
-          .stringSegment(StringSegmentSyntax(content: .stringSegment("line 2", leadingTrivia: [.spaces(2)], trailingTrivia: .newline))),
+          .stringSegment(
+            StringSegmentSyntax(
+              content: .stringSegment("line 2", leadingTrivia: [.spaces(2)], trailingTrivia: .newline)
+            )
+          ),
         ]),
         closingQuote: .multilineStringQuoteToken(leadingTrivia: [.spaces(2)]),
         closingPounds: nil
@@ -1967,6 +2188,40 @@ final class StatementExpressionTests: ParserTestCase {
     )
   }
 
+  func testUnsafeExpr() {
+    assertParse(
+      """
+      func f() {
+        let x = unsafe y
+      }
+      """,
+      experimentalFeatures: .unsafeExpression
+    )
+
+    assertParse(
+      """
+      func f() {
+        let x = unsafe1️⃣ y
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "consecutive statements on a line must be separated by newline or ';'",
+          fixIts: [
+            "insert newline",
+            "insert ';'",
+          ]
+        )
+      ],
+      fixedSource: """
+        func f() {
+          let x = unsafe
+          y
+        }
+        """
+    )
+  }
+
   func testUnterminatedInterpolationAtEndOfMultilineStringLiteral() {
     assertParse(
       #"""
@@ -1974,8 +2229,16 @@ final class StatementExpressionTests: ParserTestCase {
       """
       """#,
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "multi-line string literal content must begin on a new line", fixIts: ["insert newline"]),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "expected value and ')' to end tuple", fixIts: ["insert value and ')'"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "multi-line string literal content must begin on a new line",
+          fixIts: ["insert newline"]
+        ),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected value and ')' to end tuple",
+          fixIts: ["insert value and ')'"]
+        ),
       ],
       fixedSource: #"""
         """
@@ -2281,13 +2544,21 @@ final class StatementExpressionTests: ParserTestCase {
       "abc"2️⃣#3️⃣
       """#,
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "expected identifier in macro expansion", fixIts: ["insert identifier"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected identifier in macro expansion",
+          fixIts: ["insert identifier"]
+        ),
         DiagnosticSpec(
           locationMarker: "2️⃣",
           message: "consecutive statements on a line must be separated by newline or ';'",
           fixIts: ["insert newline", "insert ';'"]
         ),
-        DiagnosticSpec(locationMarker: "3️⃣", message: "expected identifier in macro expansion", fixIts: ["insert identifier"]),
+        DiagnosticSpec(
+          locationMarker: "3️⃣",
+          message: "expected identifier in macro expansion",
+          fixIts: ["insert identifier"]
+        ),
       ],
       applyFixIts: ["insert identifier", "insert ';'"],
       fixedSource: #"""
@@ -2395,8 +2666,16 @@ final class StatementExpressionTests: ParserTestCase {
       #2️⃣
       """#,
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: ##"expected '"#' to end string literal"##, fixIts: [##"insert '"#'"##]),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "expected identifier in macro expansion", fixIts: ["insert identifier"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: ##"expected '"#' to end string literal"##,
+          fixIts: [##"insert '"#'"##]
+        ),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected identifier in macro expansion",
+          fixIts: ["insert identifier"]
+        ),
       ],
       fixedSource: #"""
         #"abc""#
@@ -2717,7 +2996,7 @@ final class StatementExpressionTests: ParserTestCase {
   func testClosureWithMissingParentheses() {
     assertParse(
       """
-      _ = { 1️⃣a: Int, b: Int 2️⃣in
+      _ = { 1️⃣a: Int, b: Int2️⃣ in
       }
       """,
       diagnostics: [
@@ -2742,7 +3021,7 @@ final class StatementExpressionTests: ParserTestCase {
   func testClosureWithReturnArrowAndMissingParentheses() {
     assertParse(
       """
-      _ = { 1️⃣a: Int, b: 2️⃣Int 3️⃣-> Int 4️⃣in
+      _ = { 1️⃣a: Int, b: 2️⃣Int3️⃣ -> Int4️⃣ in
       }
       """,
       diagnostics: [
@@ -2817,6 +3096,77 @@ final class StatementExpressionTests: ParserTestCase {
     )
   }
 
+  func testClosureWithMalformedParameters() {
+    assertParse(
+      """
+      test { (1️⃣[X]) in }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "expected identifier and ':' in parameter", fixIts: ["insert identifier and ':'"])
+      ],
+      fixedSource: """
+        test { (<#identifier#>: [X]) in }
+        """
+    )
+
+    assertParse(
+      """
+      test { (1️⃣: [X]) in }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "expected identifier in parameter", fixIts: ["insert identifier"])
+      ],
+      fixedSource: """
+        test { (<#identifier#>: [X]) in }
+        """
+    )
+
+    assertParse(
+      """
+      test { (1️⃣:2️⃣) in }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected identifier in parameter",
+          fixIts: ["insert identifier"]
+        ),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected type in parameter",
+          fixIts: ["insert type"]
+        ),
+      ],
+      fixedSource: """
+        test { (<#identifier#>: <#type#>) in }
+        """
+    )
+
+    assertParse(
+      """
+      test { (foo1️⃣ @bar baz) in }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "expected ':' in parameter", fixIts: ["insert ':'"])
+      ],
+      fixedSource: """
+        test { (foo: @bar baz) in }
+        """
+    )
+
+    assertParse(
+      """
+      test { (x: 1️⃣) in }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "expected type in parameter", fixIts: ["insert type"])
+      ],
+      fixedSource: """
+        test { (x: <#type#>) in }
+        """
+    )
+  }
+
   func testTypedThrowsDisambiguation() {
     assertParse(
       "[() throws(MyError) 1️⃣async -> Void]()",
@@ -2828,38 +3178,50 @@ final class StatementExpressionTests: ParserTestCase {
     assertParse(
       "[() throws 1️⃣async2️⃣(MyError) -> Void]()",
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "'async' must precede 'throws'", fixIts: ["move 'async' in front of 'throws'"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "'async' must precede 'throws'",
+          fixIts: ["move 'async' in front of 'throws'"]
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: "unexpected code '(MyError)' in array element"),
       ],
       fixedSource: "[() async throws (MyError) -> Void]()"
     )
     assertParse(
-      "[() 1️⃣try(MyError) async -> Void]()",
+      "[()1️⃣ try(MyError) async -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), try(MyError) async -> Void]()"
     )
     assertParse(
-      "[() 1️⃣try async(MyError) -> Void]()",
+      "[()1️⃣ try async(MyError) -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), try async(MyError) -> Void]()"
     )
     assertParse(
       "[() throws(MyError) 1️⃣await -> Void]()",
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "'await' must precede 'throws'", fixIts: ["move 'await' in front of 'throws'"])
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "'await' must precede 'throws'",
+          fixIts: ["move 'await' in front of 'throws'"]
+        )
       ],
       fixedSource: "[() async throws(MyError) -> Void]()"
     )
     assertParse(
       "[() throws 1️⃣await2️⃣(MyError) -> Void]()",
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "'await' must precede 'throws'", fixIts: ["move 'await' in front of 'throws'"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "'await' must precede 'throws'",
+          fixIts: ["move 'await' in front of 'throws'"]
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: "unexpected code '(MyError)' in array element"),
       ],
       fixedSource: "[() async throws (MyError) -> Void]()"
     )
     assertParse(
-      "[() 1️⃣try(MyError) 2️⃣await 3️⃣-> Void]()",
+      "[()1️⃣ try(MyError)2️⃣ await 3️⃣-> Void]()",
       diagnostics: [
         DiagnosticSpec(
           locationMarker: "1️⃣",
@@ -2880,27 +3242,30 @@ final class StatementExpressionTests: ParserTestCase {
       fixedSource: "[(), try(MyError), await <#expression#> -> Void]()"
     )
     assertParse(
-      "[() 1️⃣try await(MyError) -> Void]()",
+      "[()1️⃣ try await(MyError) -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), try await(MyError) -> Void]()"
     )
     assertParse(
-      "[() 1️⃣async(MyError) -> Void]()",
+      "[()1️⃣ async(MyError) -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), async(MyError) -> Void]()"
     )
     assertParse(
-      "[() 1️⃣await(MyError) -> Void]()",
+      "[()1️⃣ await(MyError) -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), await(MyError) -> Void]()"
     )
     assertParse(
-      "[() 1️⃣try(MyError) -> Void]()",
+      "[()1️⃣ try(MyError) -> Void]()",
       diagnostics: [DiagnosticSpec(message: "expected ',' in array element", fixIts: ["insert ','"])],
       fixedSource: "[(), try(MyError) -> Void]()"
     )
     assertParse(
       "[() throws(MyError) -> Void]()"
+    )
+    assertParse(
+      "[() throws(any Error) -> Void]()"
     )
     assertParse(
       "X<() throws(MyError) -> Int>()"
@@ -2910,11 +3275,27 @@ final class StatementExpressionTests: ParserTestCase {
     )
   }
 
+  func testTypedThrowsClosureParam() {
+    assertParse(
+      """
+      try foo { (a, b) throws(S) in 1 }
+      """
+    )
+  }
+
+  func testTypedThrowsShorthandClosureParams() {
+    assertParse(
+      """
+      try foo { a, b throws(S) in 1 }
+      """
+    )
+  }
+
   func testArrayExprWithNoCommas() {
     assertParse("[() ()]")
 
     assertParse(
-      "[1 1️⃣2]",
+      "[11️⃣ 2]",
       diagnostics: [
         DiagnosticSpec(
           message: "expected ',' in array element",
@@ -2925,7 +3306,7 @@ final class StatementExpressionTests: ParserTestCase {
     )
 
     assertParse(
-      #"["hello" 1️⃣"world"]"#,
+      #"["hello"1️⃣ "world"]"#,
       diagnostics: [
         DiagnosticSpec(
           message: "expected ',' in array element",
@@ -2938,7 +3319,7 @@ final class StatementExpressionTests: ParserTestCase {
 
   func testDictionaryExprWithNoCommas() {
     assertParse(
-      "[1: () 1️⃣2: ()]",
+      "[1: ()1️⃣ 2: ()]",
       diagnostics: [
         DiagnosticSpec(
           message: "expected ',' in dictionary element",
@@ -2949,7 +3330,7 @@ final class StatementExpressionTests: ParserTestCase {
     )
 
     assertParse(
-      #"["foo": 1 1️⃣"bar": 2]"#,
+      #"["foo": 11️⃣ "bar": 2]"#,
       diagnostics: [
         DiagnosticSpec(
           message: "expected ',' in dictionary element",
@@ -2960,7 +3341,7 @@ final class StatementExpressionTests: ParserTestCase {
     )
 
     assertParse(
-      #"[1: "hello" 1️⃣2: "world"]"#,
+      #"[1: "hello"1️⃣ 2: "world"]"#,
       diagnostics: [
         DiagnosticSpec(
           message: "expected ',' in dictionary element",
@@ -2975,6 +3356,51 @@ final class StatementExpressionTests: ParserTestCase {
     assertParse(
       "f { @Sendable (e: Int) in }",
       substructure: AttributeSyntax(attributeName: TypeSyntax("Sendable"))
+    )
+  }
+
+  func testFunctionWithMissingLabel() {
+    assertParse(
+      "foo(1️⃣: 1)",
+      diagnostics: [
+        DiagnosticSpec(
+          message: "expected label in function call",
+          fixIts: ["insert label"]
+        )
+      ],
+      fixedSource: "foo(<#identifier#>: 1)"
+    )
+  }
+
+  func testSubscriptDeinitMembers() {
+    assertParse(
+      """
+      .deinit
+      """,
+      substructure: DeclReferenceExprSyntax(baseName: .identifier("deinit"))
+    )
+
+    assertParse(
+      """
+      .subscript
+      """,
+      substructure: DeclReferenceExprSyntax(baseName: .identifier("subscript"))
+    )
+
+    assertParse(
+      """
+      x.1️⃣deinit
+      """,
+      substructure: DeclReferenceExprSyntax(baseName: .identifier("deinit")),
+      substructureAfterMarker: "1️⃣"
+    )
+
+    assertParse(
+      """
+      x.1️⃣subscript
+      """,
+      substructure: DeclReferenceExprSyntax(baseName: .identifier("subscript")),
+      substructureAfterMarker: "1️⃣"
     )
   }
 }

@@ -10,6 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_implementationOnly private import _SwiftSyntaxCShims
+#else
+@_implementationOnly import _SwiftSyntaxCShims
+#endif
+
 /// A syntax arena owns the memory for all syntax nodes within it.
 ///
 /// The following is only relevant if you are accessing the raw syntax tree using
@@ -37,6 +43,7 @@
 /// As an added benefit of the ``SyntaxArena``, `RawSyntax` nodes don’t need to
 /// be reference-counted, further improving the performance of ``SwiftSyntax``
 /// when worked with at that level.
+@_spi(RawSyntax)
 public class SyntaxArena {
   /// Bump-pointer allocator for all "intern" methods.
   fileprivate let allocator: BumpPtrAllocator
@@ -49,7 +56,10 @@ public class SyntaxArena {
   #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
   /// Whether or not this arena has been added to other arenas as a child.
   /// Used to make sure we don’t introduce retain cycles between arenas.
-  private var hasParent: Bool
+  ///
+  /// - Important: This is only intended to be used for assertions to catch
+  ///   retain cycles in syntax arenas.
+  fileprivate let hasParent: UnsafeMutablePointer<AtomicBool>
   #endif
 
   /// Construct a new ``SyntaxArena`` in which syntax nodes can be allocated.
@@ -58,10 +68,10 @@ public class SyntaxArena {
   }
 
   fileprivate init(slabSize: Int) {
-    self.allocator = BumpPtrAllocator(slabSize: slabSize)
+    self.allocator = BumpPtrAllocator(initialSlabSize: slabSize)
     self.childRefs = []
     #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
-    self.hasParent = false
+    self.hasParent = swiftsyntax_atomic_bool_create(false)
     #endif
   }
 
@@ -69,33 +79,9 @@ public class SyntaxArena {
     for child in childRefs {
       child.release()
     }
-  }
-
-  /// If this arena or any of its child arenas is a ``ParsingSyntaxArena``
-  /// return one of these arenas, otherwise return `nil`.
-  ///
-  /// If the arena has multiple child nodes that are ``ParsingSyntaxArena``s, it
-  /// is undefined which one will be returned.
-  ///
-  /// The use case for this is to get the trivia parsing function of the arena.
-  /// Parsed tokens created by `SwiftParser` automatically reside in a
-  /// ``ParsingSyntaxArena`` but if they are modified (e.g. using the `with`
-  /// functions), they might reside in a new arena. But we still want to be able
-  /// to retrieve trivia from those modified tokens, which requires calling into
-  /// the `parseTrivia` function of the ``ParsingSyntaxArena`` that created the
-  /// token. Since the modified syntax arena needs to keep the original
-  /// ``ParsingSyntaxArena`` alive, we can search this arena’s `childRefs` for
-  /// the ``ParsingSyntaxArena`` that created the token.
-  var parsingArena: ParsingSyntaxArena? {
-    if let parsingArena = self as? ParsingSyntaxArena {
-      return parsingArena
-    }
-    for child in childRefs {
-      if let parsingArena = child.value.parsingArena {
-        return parsingArena
-      }
-    }
-    return nil
+    #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
+    swiftsyntax_atomic_bool_destroy(self.hasParent)
+    #endif
   }
 
   /// Allocates a buffer of `RawSyntax?` with the given count, then returns the
@@ -120,7 +106,6 @@ public class SyntaxArena {
 
   /// Copies the contents of a ``SyntaxText`` to the memory this arena manages,
   /// and return the ``SyntaxText`` in the destination.
-  @_spi(RawSyntax)
   public func intern(_ value: SyntaxText) -> SyntaxText {
     // Return the passed-in value if it's already managed by this arena.
     if self.contains(text: value) {
@@ -134,7 +119,6 @@ public class SyntaxArena {
 
   /// Copies a UTF8 sequence of `String` to the memory this arena manages, and
   /// returns the copied string as a ``SyntaxText``
-  @_spi(RawSyntax)
   public func intern(_ value: String) -> SyntaxText {
     if value.isEmpty { return SyntaxText() }
     var value = value
@@ -165,7 +149,7 @@ public class SyntaxArena {
 
     #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
     precondition(
-      !self.hasParent,
+      !swiftsyntax_atomic_bool_get(self.hasParent),
       "an arena can't have a new child once it's owned by other arenas"
     )
     #endif
@@ -173,17 +157,8 @@ public class SyntaxArena {
     if childRefs.insert(otherRef).inserted {
       otherRef.retain()
       #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
-      // FIXME: This may trigger a data race warning in Thread Sanitizer.
-      // Can we use atomic bool here?
-      otherRef.value.hasParent = true
+      otherRef.setHasParent(true)
       #endif
-    }
-  }
-
-  /// Recursively checks if this arena contains given `arenaRef` as a descendant.
-  func contains(arenaRef: SyntaxArenaRef) -> Bool {
-    childRefs.contains { childRef in
-      childRef == arenaRef || childRef.value.contains(arenaRef: arenaRef)
     }
   }
 
@@ -197,17 +172,18 @@ public class SyntaxArena {
 }
 
 /// SyntaxArena for parsing.
+@_spi(RawSyntax)
 public class ParsingSyntaxArena: SyntaxArena {
-  @_spi(RawSyntax)
   public typealias ParseTriviaFunction = (_ source: SyntaxText, _ position: TriviaPosition) -> [RawTriviaPiece]
 
   /// Source file buffer the Syntax tree represents.
   private var sourceBuffer: UnsafeBufferPointer<UInt8>
 
   /// Function to parse trivia.
-  private var parseTriviaFunction: ParseTriviaFunction
+  ///
+  /// - Important: Must never be changed to a mutable value. See `SyntaxArenaRef.parseTrivia`.
+  private let parseTriviaFunction: ParseTriviaFunction
 
-  @_spi(RawSyntax)
   public init(parseTriviaFunction: @escaping ParseTriviaFunction) {
     self.sourceBuffer = .init(start: nil, count: 0)
     self.parseTriviaFunction = parseTriviaFunction
@@ -220,7 +196,6 @@ public class ParsingSyntaxArena: SyntaxArena {
   /// The interned buffer is guaranteed to be null-terminated.
   /// `contains(address _:)` is faster if the address is inside the memory
   /// range this function returned.
-  @_spi(RawSyntax)
   public func internSourceBuffer(_ buffer: UnsafeBufferPointer<UInt8>) -> UnsafeBufferPointer<UInt8> {
     let allocated = allocator.allocate(
       UInt8.self,
@@ -236,7 +211,6 @@ public class ParsingSyntaxArena: SyntaxArena {
     return sourceBuffer
   }
 
-  @_spi(RawSyntax)
   public override func contains(text: SyntaxText) -> Bool {
     if let addr = text.baseAddress, self.sourceBufferContains(addr) {
       return true
@@ -252,9 +226,25 @@ public class ParsingSyntaxArena: SyntaxArena {
   }
 
   /// Parse `source` into a list of ``RawTriviaPiece`` using `parseTriviaFunction`.
-  @_spi(RawSyntax)
   public func parseTrivia(source: SyntaxText, position: TriviaPosition) -> [RawTriviaPiece] {
+    // Must never access mutable state. See `SyntaxArenaRef.parseTrivia`.
     return self.parseTriviaFunction(source, position)
+  }
+}
+
+/// An opaque wrapper around `SyntaxArena` that keeps the arena alive.
+@_spi(RawSyntax)
+public struct RetainedSyntaxArena: @unchecked Sendable {
+  // Unchecked conformance to sendable is fine because `arena` is not
+  // accessible. It is just used to keep the arena alive.
+  private let arena: SyntaxArena
+
+  init(_ arena: SyntaxArena) {
+    self.arena = arena
+  }
+
+  fileprivate func arenaRef() -> SyntaxArenaRef {
+    return SyntaxArenaRef(arena)
   }
 }
 
@@ -264,7 +254,7 @@ public class ParsingSyntaxArena: SyntaxArena {
 /// `RawSyntaxData` holds its ``SyntaxArena`` in this form to prevent their cyclic
 /// strong references. Also, passing around ``SyntaxArena`` in this form doesn't
 /// cause any ref-counting traffic.
-struct SyntaxArenaRef: Hashable {
+struct SyntaxArenaRef: Hashable, @unchecked Sendable {
   private let _value: Unmanaged<SyntaxArena>
 
   init(_ value: __shared SyntaxArena) {
@@ -272,8 +262,15 @@ struct SyntaxArenaRef: Hashable {
   }
 
   /// Returns the ``SyntaxArena``
-  var value: SyntaxArena {
+  private var value: SyntaxArena {
     get { self._value.takeUnretainedValue() }
+  }
+
+  /// Assuming that this references a `ParsingSyntaxArena`,
+  func parseTrivia(source: SyntaxText, position: TriviaPosition) -> [RawTriviaPiece] {
+    // It is safe to access `_value` here because `parseTrivia` only accesses
+    // `parseTriviaFunction`, which is a constant.
+    (value as! ParsingSyntaxArena).parseTrivia(source: source, position: position)
   }
 
   func retain() {
@@ -284,11 +281,50 @@ struct SyntaxArenaRef: Hashable {
     self._value.release()
   }
 
+  /// Get an opaque wrapper that keeps the syntax arena alive.
+  var retained: RetainedSyntaxArena {
+    return RetainedSyntaxArena(value)
+  }
+
+  /// Copies a UTF8 sequence of `String` to the memory the referenced arena manages, and
+  /// returns the copied string as a ``SyntaxText``
+  func intern(_ value: String) -> SyntaxText {
+    self.value.intern(value)
+  }
+
+  #if DEBUG || SWIFTSYNTAX_ENABLE_ASSERTIONS
+  /// Accessor for the underlying's `SyntaxArena.hasParent`
+  var hasParent: Bool {
+    swiftsyntax_atomic_bool_get(value.hasParent)
+  }
+
+  /// Sets the `SyntaxArena.hasParent` on the referenced arena.
+  func setHasParent(_ newValue: Bool) {
+    swiftsyntax_atomic_bool_set(value.hasParent, newValue)
+  }
+  #endif
+
   func hash(into hasher: inout Hasher) {
     hasher.combine(_value.toOpaque())
   }
 
   static func == (lhs: SyntaxArenaRef, rhs: SyntaxArenaRef) -> Bool {
     return lhs._value.toOpaque() == rhs._value.toOpaque()
+  }
+
+  static func == (lhs: SyntaxArenaRef, rhs: __shared SyntaxArena) -> Bool {
+    return lhs == SyntaxArenaRef(rhs)
+  }
+
+  static func == (lhs: __shared SyntaxArena, rhs: SyntaxArenaRef) -> Bool {
+    return rhs == lhs
+  }
+
+  static func == (lhs: SyntaxArenaRef, rhs: RetainedSyntaxArena) -> Bool {
+    return lhs == rhs.arenaRef()
+  }
+
+  static func == (lhs: RetainedSyntaxArena, rhs: SyntaxArenaRef) -> Bool {
+    return rhs == lhs
   }
 }

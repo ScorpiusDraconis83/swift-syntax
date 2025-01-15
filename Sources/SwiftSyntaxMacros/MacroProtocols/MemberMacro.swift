@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Describes a macro that can add members to the declaration it's attached to.
 public protocol MemberMacro: AttachedMacro {
@@ -37,7 +41,7 @@ public protocol MemberMacro: AttachedMacro {
   /// - Parameters:
   ///   - node: The custom attribute describing the attached macro.
   ///   - declaration: The declaration the macro attribute is attached to.
-  ///   - conformingTo: The set of protocols that were declared
+  ///   - protocols: The set of protocols that were declared
   ///     in the set of conformances for the macro and to which the declaration
   ///     does not explicitly conform. The member macro itself cannot declare
   ///     conformances to these protocols (only an extension macro can do that),
@@ -66,9 +70,9 @@ private struct UnimplementedExpansionMethodError: Error, CustomStringConvertible
   }
 }
 
-public extension MemberMacro {
+extension MemberMacro {
   /// Default implementation supplies no conformances.
-  static func expansion(
+  public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     in context: some MacroExpansionContext
@@ -77,7 +81,12 @@ public extension MemberMacro {
   }
 
   /// Default implementation that ignores the unhandled conformances.
-  static func expansion(
+  @available(
+    *,
+    deprecated,
+    message: "`MemberMacro` conformance should implement the `expansion` function that takes a `conformingTo` parameter"
+  )
+  public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     conformingTo protocols: [TypeSyntax],

@@ -16,12 +16,20 @@ import SyntaxSupport
 import Utils
 
 let buildableNodesFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("@_spi(ExperimentalLanguageFeatures) import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    @_spi(ExperimentalLanguageFeatures) public import SwiftSyntax
+    #else
+    @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+    #endif
+    """
+  )
 
   for node in SYNTAX_NODES.compactMap(\.layoutNode) {
     let type = node.type
 
-    if let convenienceInit = try! node.createConvenienceBuilderInitializer() {
+    if let convenienceInit = try! InitSignature(node).createConvenienceBuilderInitializer() {
       DeclSyntax(
         """
         extension \(type.syntaxBaseName) {

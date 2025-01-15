@@ -12,6 +12,7 @@
 
 // NOTE: Types in this file should be self-contained and should not depend on any non-stdlib types.
 
+@_spi(PluginMessage)
 public enum HostToPluginMessage: Codable {
   /// Send capability of the host, and get capability of the plugin.
   case getCapability(
@@ -23,7 +24,8 @@ public enum HostToPluginMessage: Codable {
     macro: PluginMessage.MacroReference,
     macroRole: PluginMessage.MacroRole? = nil,
     discriminator: String,
-    syntax: PluginMessage.Syntax
+    syntax: PluginMessage.Syntax,
+    lexicalContext: [PluginMessage.Syntax]? = nil
   )
 
   /// Expand an '@attached' macro.
@@ -35,7 +37,8 @@ public enum HostToPluginMessage: Codable {
     declSyntax: PluginMessage.Syntax,
     parentDeclSyntax: PluginMessage.Syntax?,
     extendedTypeSyntax: PluginMessage.Syntax?,
-    conformanceListSyntax: PluginMessage.Syntax?
+    conformanceListSyntax: PluginMessage.Syntax?,
+    lexicalContext: [PluginMessage.Syntax]? = nil
   )
 
   /// Optionally implemented message to load a dynamic link library.
@@ -47,6 +50,7 @@ public enum HostToPluginMessage: Codable {
   )
 }
 
+@_spi(PluginMessage)
 public enum PluginToHostMessage: Codable {
   case getCapabilityResult(
     capability: PluginMessage.PluginCapability
@@ -76,6 +80,7 @@ public enum PluginToHostMessage: Codable {
   )
 }
 
+@_spi(PluginMessage)
 public enum PluginMessage {
   public static var PROTOCOL_VERSION_NUMBER: Int { 7 }  // Pass extension protocol list
 
@@ -100,7 +105,7 @@ public enum PluginMessage {
     }
   }
 
-  public struct MacroReference: Codable {
+  public struct MacroReference: Codable, Sendable {
     public var moduleName: String
     public var typeName: String
 
@@ -114,7 +119,7 @@ public enum PluginMessage {
     }
   }
 
-  public enum MacroRole: String, Codable {
+  public enum MacroRole: String, Codable, Sendable {
     case expression
     case declaration
     case accessor
@@ -224,7 +229,14 @@ public enum PluginMessage {
     public var notes: [Note]
     public var fixIts: [FixIt]
 
-    internal init(message: String, severity: Severity, position: Position, highlights: [PositionRange], notes: [Note], fixIts: [FixIt]) {
+    public init(
+      message: String,
+      severity: Severity,
+      position: Position,
+      highlights: [PositionRange],
+      notes: [Note],
+      fixIts: [FixIt]
+    ) {
       self.message = message
       self.severity = severity
       self.position = position

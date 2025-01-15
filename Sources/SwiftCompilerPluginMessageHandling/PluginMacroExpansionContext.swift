@@ -10,11 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftDiagnostics
+internal import SwiftOperators
+internal import SwiftParser
+internal import SwiftSyntax
+internal import SwiftSyntaxMacros
+#else
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
+#endif
+
+/// Caching parser for PluginMessage.Syntax
+class ParsedSyntaxRegistry {
+  struct Key: Hashable {
+    let source: String
+    let kind: PluginMessage.Syntax.Kind
+  }
+
+  private var storage: LRUCache<Key, Syntax>
+
+  init(cacheCapacity: Int) {
+    self.storage = LRUCache(capacity: cacheCapacity)
+  }
+
+  private func parse(source: String, kind: PluginMessage.Syntax.Kind) -> Syntax {
+    var parser = Parser(source)
+    switch kind {
+    case .declaration:
+      return Syntax(DeclSyntax.parse(from: &parser))
+    case .statement:
+      return Syntax(StmtSyntax.parse(from: &parser))
+    case .expression:
+      return Syntax(ExprSyntax.parse(from: &parser))
+    case .type:
+      return Syntax(TypeSyntax.parse(from: &parser))
+    case .pattern:
+      return Syntax(PatternSyntax.parse(from: &parser))
+    case .attribute:
+      return Syntax(AttributeSyntax.parse(from: &parser))
+    }
+  }
+
+  func get(source: String, kind: PluginMessage.Syntax.Kind) -> Syntax {
+    let key = Key(source: source, kind: kind)
+    if let cached = storage[key] {
+      return cached
+    }
+
+    let node = parse(source: source, kind: kind)
+    storage[key] = node
+    return node
+  }
+}
 
 /// Manages known source code combined with their filename/fileID. This can be
 /// used to get line/column from a syntax node in the managed source code.
@@ -59,8 +110,15 @@ class SourceManager {
     var endUTF8Offset: Int
   }
 
+  /// Caching syntax parser.
+  private let syntaxRegistry: ParsedSyntaxRegistry
+
   /// Syntax added by `add(_:)` method. Keyed by the `id` of the node.
   private var knownSourceSyntax: [Syntax.ID: KnownSourceSyntax] = [:]
+
+  init(syntaxRegistry: ParsedSyntaxRegistry) {
+    self.syntaxRegistry = syntaxRegistry
+  }
 
   /// Convert syntax information to a ``Syntax`` node. The location informations
   /// are cached in the source manager to provide `location(of:)` et al.
@@ -69,22 +127,7 @@ class SourceManager {
     foldingWith operatorTable: OperatorTable? = nil
   ) -> Syntax {
 
-    var node: Syntax
-    var parser = Parser(syntaxInfo.source)
-    switch syntaxInfo.kind {
-    case .declaration:
-      node = Syntax(DeclSyntax.parse(from: &parser))
-    case .statement:
-      node = Syntax(StmtSyntax.parse(from: &parser))
-    case .expression:
-      node = Syntax(ExprSyntax.parse(from: &parser))
-    case .type:
-      node = Syntax(TypeSyntax.parse(from: &parser))
-    case .pattern:
-      node = Syntax(PatternSyntax.parse(from: &parser))
-    case .attribute:
-      node = Syntax(AttributeSyntax.parse(from: &parser))
-    }
+    var node = syntaxRegistry.get(source: syntaxInfo.source, kind: syntaxInfo.kind)
     if let operatorTable {
       node = operatorTable.foldAll(node, errorHandler: { _ in /*ignore*/ })
     }
@@ -127,25 +170,34 @@ class SourceManager {
     from startKind: PositionInSyntaxNode = .afterLeadingTrivia,
     to endKind: PositionInSyntaxNode = .beforeTrailingTrivia
   ) -> SourceRange? {
+    range(node.position(at: startKind)..<node.position(at: endKind), in: node)
+  }
+
+  /// Get ``SourceRange`` (file name + UTF-8 offset range) of `localRange` in `node`'s root node, which must be one
+  /// of the returned values from `add(_:)`.
+  func range(
+    _ localRange: @autoclosure () -> Range<AbsolutePosition>,
+    in node: some SyntaxProtocol
+  ) -> SourceRange? {
     guard let base = self.knownSourceSyntax[node.root.id] else {
       return nil
     }
-    let localStartPosition = node.position(at: startKind)
-    let localEndPosition = node.position(at: endKind)
-    precondition(localStartPosition <= localEndPosition)
-
     let positionOffset = base.location.offset
-
+    let localRange = localRange()
     return SourceRange(
       fileName: base.location.fileName,
-      startUTF8Offset: localStartPosition.advanced(by: positionOffset).utf8Offset,
-      endUTF8Offset: localEndPosition.advanced(by: positionOffset).utf8Offset
+      startUTF8Offset: localRange.lowerBound.advanced(by: positionOffset).utf8Offset,
+      endUTF8Offset: localRange.upperBound.advanced(by: positionOffset).utf8Offset
     )
   }
 
   /// Get location of `node` in the known root nodes.
   /// The root node of `node` must be one of the returned value from `add(_:)`.
-  func location(of node: Syntax, at kind: PositionInSyntaxNode, filePathMode: SourceLocationFilePathMode) -> SourceLocation? {
+  func location(
+    of node: Syntax,
+    at kind: PositionInSyntaxNode,
+    filePathMode: SourceLocationFilePathMode
+  ) -> SourceLocation? {
     guard let base = self.knownSourceSyntax[node.root.id] else {
       return nil
     }
@@ -153,14 +205,18 @@ class SourceManager {
     switch filePathMode {
     case .fileID: file = base.location.fileID
     case .filePath: file = base.location.fileName
+    #if RESILIENT_LIBRARIES
+    @unknown default: fatalError()
+    #endif
     }
 
     let localPosition = node.position(at: kind)
     let localLocation = base.locationConverter.location(for: localPosition)
 
     let positionOffset = base.location.offset
+    // NOTE '- 1' because base.location.{line|column} are 1-based.
     let lineOffset = base.location.line - 1
-    let columnOffset = localLocation.line == 1 ? base.location.column : 0
+    let columnOffset = localLocation.line == 1 ? (base.location.column - 1) : 0
 
     return SourceLocation(
       // NOTE: IUO because 'localLocation' is created by a location converter
@@ -185,12 +241,19 @@ fileprivate extension Syntax {
       return self.endPositionBeforeTrailingTrivia
     case .afterTrailingTrivia:
       return self.endPosition
+    #if RESILIENT_LIBRARIES
+    @unknown default:
+      fatalError()
+    #endif
     }
   }
 }
 
 class PluginMacroExpansionContext {
   private var sourceManger: SourceManager
+
+  /// The lexical context of the macro expansion described by this context.
+  let lexicalContext: [Syntax]
 
   /// The macro expansion discriminator, which is used to form unique names
   /// when requested.
@@ -208,8 +271,9 @@ class PluginMacroExpansionContext {
   /// macro.
   internal private(set) var diagnostics: [Diagnostic] = []
 
-  init(sourceManager: SourceManager, expansionDiscriminator: String = "") {
+  init(sourceManager: SourceManager, lexicalContext: [Syntax], expansionDiscriminator: String = "") {
     self.sourceManger = sourceManager
+    self.lexicalContext = lexicalContext
     self.expansionDiscriminator = expansionDiscriminator
   }
 }

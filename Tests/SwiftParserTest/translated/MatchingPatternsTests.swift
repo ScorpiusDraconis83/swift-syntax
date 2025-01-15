@@ -13,6 +13,7 @@
 // This test file has been translated from swift/test/Parse/matching_patterns.swift
 
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 import XCTest
 
 final class MatchingPatternsTests: ParserTestCase {
@@ -509,8 +510,6 @@ final class MatchingPatternsTests: ParserTestCase {
   func testMatchingPatterns31() {
     assertParse(
       #"""
-      // FIXME: We don't currently allow subpatterns for "isa" patterns that
-      // require interesting conditional downcasts.
       class Base { }
       class Derived : Base { }
       """#
@@ -606,6 +605,124 @@ final class MatchingPatternsTests: ParserTestCase {
       guard case _borrowing z = y else {}
       """,
       experimentalFeatures: .referenceBindings
+    )
+  }
+
+  func testBorrowingContextualParsing() {
+    assertParse(
+      """
+      switch 42 {
+      case borrowing .foo(): // parses as `borrowing.foo()` as before
+        break
+      }
+      """,
+      substructure: ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("borrowing")))
+    )
+
+    assertParse(
+      """
+      switch 42 {
+      case borrowing (): // parses as `borrowing()` as before
+        break
+      }
+      """,
+      substructure: ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("borrowing")))
+    )
+
+    assertParse(
+      """
+      switch 42 {
+      case borrowing x: // parses as binding
+        break
+      }
+      """,
+      substructure: PatternSyntax(
+        ValueBindingPatternSyntax(
+          bindingSpecifier: .keyword(.borrowing),
+          pattern: PatternSyntax(IdentifierPatternSyntax(identifier: .identifier("x")))
+        )
+      )
+    )
+
+    assertParse(
+      """
+      switch bar {
+      case .payload(borrowing x): // parses as binding
+        break
+      }
+      """,
+      substructure: PatternSyntax(
+        ValueBindingPatternSyntax(
+          bindingSpecifier: .keyword(.borrowing),
+          pattern: PatternSyntax(IdentifierPatternSyntax(identifier: .identifier("x")))
+        )
+      )
+    )
+
+    assertParse(
+      """
+      switch bar {
+      case borrowing x.member: // parses as var introducer surrounding postfix expression (which never is valid)
+        break
+      }
+      """,
+      substructure: PatternSyntax(
+        ValueBindingPatternSyntax(
+          bindingSpecifier: .keyword(.borrowing),
+          pattern: ExpressionPatternSyntax(
+            expression: MemberAccessExprSyntax(
+              base: DeclReferenceExprSyntax(baseName: .identifier("x")),
+              declName: DeclReferenceExprSyntax(baseName: .identifier("member"))
+            )
+          )
+        )
+      )
+    )
+    assertParse(
+      """
+      switch 42 {
+      case let borrowing: // parses as let binding named 'borrowing'
+        break
+      }
+      """,
+      substructure: PatternSyntax(
+        ValueBindingPatternSyntax(
+          bindingSpecifier: .keyword(.let),
+          pattern: PatternSyntax(IdentifierPatternSyntax(identifier: .identifier("borrowing")))
+        )
+      )
+    )
+    assertParse(
+      """
+      switch 42 {
+      case borrowing + borrowing: // parses as expr pattern
+        break
+      }
+      """,
+      substructure: ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("borrowing")))
+    )
+    assertParse(
+      """
+      switch 42 {
+      case borrowing(let borrowing): // parses as let binding named 'borrowing' inside a case pattern named 'borrowing'
+        break
+      }
+      """,
+      substructure: PatternSyntax(
+        ValueBindingPatternSyntax(
+          bindingSpecifier: .keyword(.let),
+          pattern: PatternSyntax(IdentifierPatternSyntax(identifier: .identifier("borrowing")))
+        )
+      )
+    )
+    assertParse(
+      """
+      switch 42 {
+      case {}(borrowing + borrowing): // parses as expr pattern
+        break
+      }
+      """,
+      substructure: ExprSyntax(DeclReferenceExprSyntax(baseName: .identifier("borrowing")))
     )
   }
 }

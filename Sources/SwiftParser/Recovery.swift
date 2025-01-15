@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 // MARK: Lookahead
 
@@ -57,17 +61,19 @@ struct RecoveryConsumptionHandle {
 extension Parser.Lookahead {
   /// See `canRecoverTo` that takes 3 specs.
   mutating func canRecoverTo(
-    _ spec: TokenSpec
+    _ spec: TokenSpec,
+    recursionDepth: Int = 1
   ) -> RecoveryConsumptionHandle? {
-    return canRecoverTo(spec, spec, spec)
+    return canRecoverTo(spec, spec, spec, recursionDepth: recursionDepth)
   }
 
   /// See `canRecoverTo` that takes 3 specs.
   mutating func canRecoverTo(
     _ spec1: TokenSpec,
-    _ spec2: TokenSpec
+    _ spec2: TokenSpec,
+    recursionDepth: Int = 1
   ) -> RecoveryConsumptionHandle? {
-    return canRecoverTo(spec1, spec2, spec1)
+    return canRecoverTo(spec1, spec2, spec1, recursionDepth: recursionDepth)
   }
 
   /// Tries eating tokens until it finds a token that matches `spec1`, `spec2` or `spec3`
@@ -80,8 +86,18 @@ extension Parser.Lookahead {
   mutating func canRecoverTo(
     _ spec1: TokenSpec,
     _ spec2: TokenSpec,
-    _ spec3: TokenSpec
+    _ spec3: TokenSpec,
+    recursionDepth: Int = 1
   ) -> RecoveryConsumptionHandle? {
+    if recursionDepth > 10 {
+      // `canRecoverTo` calls itself recursively if it finds a nested opening token, eg. when calling `canRecoverTo` on
+      // `{{{`. To avoid stack overflowing, limit the number of nested `canRecoverTo` calls we make. Since returning a
+      // recovery handle from this function only improves error recovery but is not necessary for correctness, bailing
+      // from recovery is safe.
+      // The value 10 was chosen fairly arbitrarily. It seems unlikely that we get useful recovery if we find more than
+      // 10 nested open and closing delimiters.
+      return nil
+    }
     #if SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION
     if shouldRecordAlternativeTokenChoices {
       recordAlternativeTokenChoice(for: self.currentToken, choices: [spec1, spec2, spec3])
@@ -90,7 +106,9 @@ extension Parser.Lookahead {
     let initialTokensConsumed = self.tokensConsumed
 
     let recoveryPrecedence = min(spec1.recoveryPrecedence, spec2.recoveryPrecedence, spec3.recoveryPrecedence)
-    let shouldSkipOverNewlines = recoveryPrecedence.shouldSkipOverNewlines && spec1.allowAtStartOfLine && spec2.allowAtStartOfLine && spec3.allowAtStartOfLine
+    let shouldSkipOverNewlines =
+      recoveryPrecedence.shouldSkipOverNewlines && spec1.allowAtStartOfLine && spec2.allowAtStartOfLine
+      && spec3.allowAtStartOfLine
 
     while !self.at(.endOfFile) {
       if !shouldSkipOverNewlines, self.atStartOfLine {
@@ -117,13 +135,33 @@ extension Parser.Lookahead {
       if currentTokenPrecedence >= recoveryPrecedence {
         break
       }
-      self.consumeAnyToken()
       if let closingDelimiter = currentTokenPrecedence.closingTokenKind {
         let closingDelimiterSpec = TokenSpec(closingDelimiter)
-        guard self.canRecoverTo(closingDelimiterSpec) != nil else {
-          break
+        let canCloseAtSameLine: Int? = self.withLookahead { lookahead in
+          var tokensToSkip = 0
+          while !lookahead.at(.endOfFile), !lookahead.currentToken.isAtStartOfLine {
+            tokensToSkip += 1
+            if lookahead.at(closingDelimiterSpec) {
+              return tokensToSkip
+            } else {
+              lookahead.consumeAnyToken()
+            }
+          }
+          return nil
+        }
+        if let tokensToSkip = canCloseAtSameLine {
+          for _ in 0..<tokensToSkip {
+            self.consumeAnyToken()
+          }
+          continue
+        }
+        self.consumeAnyToken()
+        guard self.canRecoverTo(closingDelimiterSpec, recursionDepth: recursionDepth + 1) != nil else {
+          continue
         }
         self.eat(closingDelimiterSpec)
+      } else {
+        self.consumeAnyToken()
       }
     }
 

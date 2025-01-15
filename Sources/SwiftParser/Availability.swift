@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension Parser {
   /// Parse a list of availability arguments.
@@ -43,7 +47,8 @@ extension Parser {
             arena: self.arena
           )
         )
-      } while keepGoing != nil && self.hasProgressed(&availabilityArgumentProgress)
+      } while keepGoing != nil
+        && self.hasProgressed(&availabilityArgumentProgress)
     }
 
     return RawAvailabilityArgumentListSyntax(elements: elements, arena: self.arena)
@@ -117,7 +122,7 @@ extension Parser {
         (.obsoleted, let handle)?:
         let argumentLabel = self.eat(handle)
         let (unexpectedBeforeColon, colon) = self.expect(.colon)
-        let version = self.parseVersionTuple(maxComponentCount: 3)
+        let version = self.parseVersionTuple()
         entry = .availabilityLabeledArgument(
           RawAvailabilityLabeledArgumentSyntax(
             label: argumentLabel,
@@ -130,7 +135,7 @@ extension Parser {
       case (.deprecated, let handle)?:
         let argumentLabel = self.eat(handle)
         if let colon = self.consume(if: .colon) {
-          let version = self.parseVersionTuple(maxComponentCount: 3)
+          let version = self.parseVersionTuple()
           entry = .availabilityLabeledArgument(
             RawAvailabilityLabeledArgumentSyntax(
               label: argumentLabel,
@@ -145,8 +150,6 @@ extension Parser {
       case (.unavailable, let handle)?,
         (.noasync, let handle)?:
         let argument = self.eat(handle)
-        // FIXME: Can we model this in SwiftSyntax by making the
-        // 'labeled' argument part optional?
         entry = .token(argument)
       case (.star, _)?:
         entry = self.parseAvailabilitySpec()
@@ -177,8 +180,6 @@ extension Parser {
   /// Parse an availability argument.
   mutating func parseAvailabilitySpec() -> RawAvailabilityArgumentSyntax.Argument {
     if let star = self.consumeIfContextualPunctuator("*") {
-      // FIXME: Use makeAvailabilityVersionRestriction here - but swift-format
-      // doesn't expect it.
       return .token(star)
     }
 
@@ -210,7 +211,7 @@ extension Parser {
 
     let version: RawVersionTupleSyntax?
     if self.at(.integerLiteral, .floatLiteral) {
-      version = self.parseVersionTuple(maxComponentCount: 3)
+      version = self.parseVersionTuple()
     } else {
       version = nil
     }
@@ -254,19 +255,22 @@ extension Parser {
   }
 
   /// Parse a dot-separated list of version numbers.
-  mutating func parseVersionTuple(maxComponentCount: Int) -> RawVersionTupleSyntax {
+  mutating func parseVersionTuple() -> RawVersionTupleSyntax {
     if self.at(.floatLiteral),
       let periodIndex = self.currentToken.tokenText.firstIndex(of: UInt8(ascii: ".")),
       self.currentToken.tokenText[0..<periodIndex].allSatisfy({ Unicode.Scalar($0).isDigit })
     {
       // The lexer generates a float literal '1.2' for the major and minor version.
       // Split it into two integers if possible
-      let major = self.consumePrefix(SyntaxText(rebasing: self.currentToken.tokenText[0..<periodIndex]), as: .integerLiteral)
+      let major = self.consumePrefix(
+        SyntaxText(rebasing: self.currentToken.tokenText[0..<periodIndex]),
+        as: .integerLiteral
+      )
 
       var components: [RawVersionComponentSyntax] = []
-      var trailingComponents: [RawVersionComponentSyntax] = []
 
-      for i in 1... {
+      var loopProgress = LoopProgressCondition()
+      while self.hasProgressed(&loopProgress) {
         guard let period = self.consume(if: .period) else {
           break
         }
@@ -274,23 +278,18 @@ extension Parser {
 
         let versionComponent = RawVersionComponentSyntax(period: period, number: version, arena: self.arena)
 
-        if i < maxComponentCount {
-          components.append(versionComponent)
-        } else {
-          trailingComponents.append(versionComponent)
-        }
+        components.append(versionComponent)
 
         if version.isMissing {
           break
         }
       }
 
-      let unexpectedTrailingComponents = RawUnexpectedNodesSyntax(trailingComponents, arena: self.arena)
       let unexpectedAfterComponents = self.parseUnexpectedVersionTokens()
       return RawVersionTupleSyntax(
         major: major,
         components: RawVersionComponentListSyntax(elements: components, arena: self.arena),
-        RawUnexpectedNodesSyntax(combining: unexpectedTrailingComponents, unexpectedAfterComponents, arena: self.arena),
+        unexpectedAfterComponents,
         arena: self.arena
       )
     } else {

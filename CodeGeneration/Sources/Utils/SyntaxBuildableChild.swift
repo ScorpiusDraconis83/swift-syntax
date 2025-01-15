@@ -23,10 +23,10 @@ public enum SyntaxOrTokenNodeKind: Hashable {
 
 /// Extension to the ``Child`` type to provide functionality specific to
 /// SwiftSyntaxBuilder.
-public extension Child {
+extension Child {
   /// The type of this child, represented by a ``SyntaxBuildableType``, which can
   /// be used to create the corresponding `Buildable` and `ExpressibleAs` types.
-  var buildableType: SyntaxBuildableType {
+  public var buildableType: SyntaxBuildableType {
     let buildableKind: SyntaxOrTokenNodeKind
     switch kind {
     case .node(kind: let kind):
@@ -44,7 +44,7 @@ public extension Child {
     )
   }
 
-  var parameterBaseType: TypeSyntax {
+  public var parameterBaseType: TypeSyntax {
     switch kind {
     case .nodeChoices:
       return self.syntaxChoicesType
@@ -53,11 +53,11 @@ public extension Child {
     }
   }
 
-  var parameterType: TypeSyntax {
+  public var parameterType: TypeSyntax {
     return self.buildableType.optionalWrapped(type: parameterBaseType)
   }
 
-  var defaultValue: ExprSyntax? {
+  public var defaultValue: ExprSyntax? {
     if isOptional || isUnexpectedNodes {
       if buildableType.isBaseType && kind.isNodeChoicesEmpty {
         return ExprSyntax("\(buildableType.buildable).none")
@@ -72,12 +72,12 @@ public extension Child {
       return buildableType.defaultValue
     }
     if token.text != nil {
-      return ExprSyntax(".\(token.varOrCaseName)Token()")
+      return ExprSyntax(".\(token.identifier)Token()")
     }
     if case .token(let choices, _, _) = kind,
       case .keyword(let keyword) = choices.only
     {
-      return ExprSyntax(".\(token.varOrCaseName)(.\(keyword.spec.varOrCaseName))")
+      return ExprSyntax(".\(token.memberCallName)(.\(keyword.spec.memberCallName))")
     }
     return nil
   }
@@ -85,9 +85,12 @@ public extension Child {
   /// If the child node has a default value, return an expression of the form
   /// ` = default_value` that can be used as the default value to for a
   /// function parameter. Otherwise, return `nil`.
-  var defaultInitialization: InitializerClauseSyntax? {
-    if let defaultValue {
-      return InitializerClauseSyntax(equal: .equalToken(leadingTrivia: .space, trailingTrivia: .space), value: defaultValue)
+  public var defaultInitialization: InitializerClauseSyntax? {
+    if providesDefaultInitialization, let defaultValue {
+      return InitializerClauseSyntax(
+        equal: .equalToken(leadingTrivia: .space, trailingTrivia: .space),
+        value: defaultValue
+      )
     } else {
       return nil
     }
@@ -96,7 +99,7 @@ public extension Child {
   /// If this node is a token that can't contain arbitrary text, generate a Swift
   /// `precondition` statement that verifies the variable with name var_name and of type
   /// ``TokenSyntax`` contains one of the supported text options. Otherwise return `nil`.
-  func generateAssertStmtTextChoices(varName: String) -> FunctionCallExprSyntax? {
+  public func generateAssertStmtTextChoices(varName: String) -> FunctionCallExprSyntax? {
     guard case .token(choices: let choices, requiresLeadingSpace: _, requiresTrailingSpace: _) = kind else {
       return nil
     }
@@ -143,14 +146,19 @@ public extension Child {
       preconditionChoices.append(
         ExprSyntax(
           SequenceExprSyntax {
-            MemberAccessExprSyntax(base: buildableType.forceUnwrappedIfNeeded(expr: DeclReferenceExprSyntax(baseName: .identifier(varName))), name: "text")
+            MemberAccessExprSyntax(
+              base: buildableType.forceUnwrappedIfNeeded(expr: DeclReferenceExprSyntax(baseName: .identifier(varName))),
+              name: "text"
+            )
             BinaryOperatorExprSyntax(text: "==")
             StringLiteralExprSyntax(content: textChoice)
           }
         )
       )
     }
-    let disjunction = ExprListSyntax(preconditionChoices.flatMap { [$0, ExprSyntax(BinaryOperatorExprSyntax(text: "||"))] }.dropLast())
+    let disjunction = ExprListSyntax(
+      preconditionChoices.flatMap { [$0, ExprSyntax(BinaryOperatorExprSyntax(text: "||"))] }.dropLast()
+    )
     return FunctionCallExprSyntax(callee: ExprSyntax("precondition")) {
       LabeledExprSyntax(expression: SequenceExprSyntax(elements: disjunction))
     }

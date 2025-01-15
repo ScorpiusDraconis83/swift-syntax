@@ -15,15 +15,6 @@
 import XCTest
 
 final class EnumTests: ParserTestCase {
-  func testEnum1() {
-    assertParse(
-      """
-      // FIXME: this test only passes on platforms which have Float80.
-      // <rdar://problem/19508460> Floating point enum raw values are not portable
-      """
-    )
-  }
-
   func testEnum2() {
     assertParse(
       """
@@ -259,7 +250,10 @@ final class EnumTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "identifier can only start with a letter or underscore, not a number"),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "identifier can only start with a letter or underscore, not a number"
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: "unexpected code ':' in enum"),
       ]
     )
@@ -288,7 +282,11 @@ final class EnumTests: ParserTestCase {
       """,
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected identifier in enum case", fixIts: ["insert identifier"]),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "expected ':' and type in parameter", fixIts: ["insert ':' and type"]),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected ':' and type in parameter",
+          fixIts: ["insert ':' and type"]
+        ),
         DiagnosticSpec(locationMarker: "3️⃣", message: "unexpected code '0' in parameter clause"),
         DiagnosticSpec(locationMarker: "4️⃣", message: "unexpected code ':' in enum"),
       ],
@@ -705,7 +703,6 @@ final class EnumTests: ParserTestCase {
     assertParse(
       """
       enum RawTypeWithRepeatValues5 : Double {
-        // FIXME: should reject.
         // 2^65-1
         case Vaughn = 36893488147419103231
         case Wilson = 36893488147419103231.0
@@ -718,7 +715,6 @@ final class EnumTests: ParserTestCase {
     assertParse(
       """
       enum RawTypeWithRepeatValues6 : Double {
-        // FIXME: should reject.
         // 2^127-1
         case Vaughn = 170141183460469231731687303715884105727
         case Wilson = 170141183460469231731687303715884105727.0
@@ -731,7 +727,6 @@ final class EnumTests: ParserTestCase {
     assertParse(
       """
       enum RawTypeWithRepeatValues7 : Double {
-        // FIXME: should reject.
         // 2^128-1
         case Vaughn = 340282366920938463463374607431768211455
         case Wilson = 340282366920938463463374607431768211455.0

@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 extension TokenConsumer {
   /// Returns `true` if the current token represents the start of a statement
@@ -54,7 +58,7 @@ extension Parser {
   mutating func parseStatement() -> RawStmtSyntax {
     // If this is a label on a loop/switch statement, consume it and pass it into
     // parsing logic below.
-    func label<S: RawStmtSyntaxNodeProtocol>(_ stmt: S, with label: Parser.StatementLabel?) -> RawStmtSyntax {
+    func label(_ stmt: some RawStmtSyntaxNodeProtocol, with label: Parser.StatementLabel?) -> RawStmtSyntax {
       guard let label = label else {
         return RawStmtSyntax(stmt)
       }
@@ -62,7 +66,7 @@ extension Parser {
         RawLabeledStmtSyntax(
           label: label.label,
           colon: label.colon,
-          statement: RawStmtSyntax(stmt),
+          statement: stmt,
           arena: self.arena
         )
       )
@@ -83,7 +87,7 @@ extension Parser {
       if self.experimentalFeatures.contains(.doExpressions) {
         let doExpr = self.parseDoExpression(doHandle: handle)
         let doStmt = RawExpressionStmtSyntax(
-          expression: RawExprSyntax(doExpr),
+          expression: doExpr,
           arena: self.arena
         )
         return label(doStmt, with: optLabel)
@@ -93,7 +97,7 @@ extension Parser {
     case (.if, let handle)?:
       let ifExpr = self.parseIfExpression(ifHandle: handle)
       let ifStmt = RawExpressionStmtSyntax(
-        expression: RawExprSyntax(ifExpr),
+        expression: ifExpr,
         arena: self.arena
       )
       return label(ifStmt, with: optLabel)
@@ -102,7 +106,7 @@ extension Parser {
     case (.switch, let handle)?:
       let switchExpr = self.parseSwitchExpression(switchHandle: handle)
       let switchStmt = RawExpressionStmtSyntax(
-        expression: RawExprSyntax(switchExpr),
+        expression: switchExpr,
         arena: self.arena
       )
       return label(switchStmt, with: optLabel)
@@ -125,8 +129,7 @@ extension Parser {
     case (.then, let handle)? where experimentalFeatures.contains(.thenStatements):
       return label(self.parseThenStatement(handle: handle), with: optLabel)
     case nil, (.then, _)?:
-      let missingStmt = RawStmtSyntax(RawMissingStmtSyntax(arena: self.arena))
-      return label(missingStmt, with: optLabel)
+      return label(RawMissingStmtSyntax(arena: self.arena), with: optLabel)
     }
   }
 }
@@ -137,7 +140,7 @@ extension Parser {
   /// Parse a guard statement.
   mutating func parseGuardStatement(guardHandle: RecoveryConsumptionHandle) -> RawGuardStmtSyntax {
     let (unexpectedBeforeGuardKeyword, guardKeyword) = self.eat(guardHandle)
-    let conditions = self.parseConditionList()
+    let conditions = self.parseConditionList(isGuardStatement: true)
     let (unexpectedBeforeElseKeyword, elseKeyword) = self.expect(.keyword(.else))
     let body = self.parseCodeBlock(introducer: guardKeyword)
     return RawGuardStmtSyntax(
@@ -154,7 +157,7 @@ extension Parser {
 
 extension Parser {
   /// Parse a list of condition elements.
-  mutating func parseConditionList() -> RawConditionElementListSyntax {
+  mutating func parseConditionList(isGuardStatement: Bool) -> RawConditionElementListSyntax {
     // We have a simple comma separated list of clauses, but also need to handle
     // a variety of common errors situations (including migrating from Swift 2
     // syntax).
@@ -162,11 +165,17 @@ extension Parser {
     var keepGoing: RawTokenSyntax? = nil
     var loopProgress = LoopProgressCondition()
     repeat {
-      let condition = self.parseConditionElement(lastBindingKind: elements.last?.condition.as(RawOptionalBindingConditionSyntax.self)?.bindingSpecifier)
+      let condition = self.parseConditionElement(
+        lastBindingKind: elements.last?.condition.as(RawOptionalBindingConditionSyntax.self)?.bindingSpecifier
+      )
       var unexpectedBeforeKeepGoing: RawUnexpectedNodesSyntax? = nil
       keepGoing = self.consume(if: .comma)
       if keepGoing == nil, let token = self.consumeIfContextualPunctuator("&&") ?? self.consume(if: .keyword(.where)) {
-        unexpectedBeforeKeepGoing = RawUnexpectedNodesSyntax(combining: unexpectedBeforeKeepGoing, token, arena: self.arena)
+        unexpectedBeforeKeepGoing = RawUnexpectedNodesSyntax(
+          combining: unexpectedBeforeKeepGoing,
+          token,
+          arena: self.arena
+        )
         keepGoing = missingToken(.comma)
       }
       elements.append(
@@ -177,9 +186,23 @@ extension Parser {
           arena: self.arena
         )
       )
-    } while keepGoing != nil && self.hasProgressed(&loopProgress)
+    } while keepGoing != nil && !atConditionListTerminator(isGuardStatement: isGuardStatement)
+      && self.hasProgressed(&loopProgress)
 
     return RawConditionElementListSyntax(elements: elements, arena: self.arena)
+  }
+
+  mutating func atConditionListTerminator(isGuardStatement: Bool) -> Bool {
+    guard experimentalFeatures.contains(.trailingComma) else {
+      return false
+    }
+    // Condition terminator is `else` for `guard` statements.
+    if isGuardStatement, self.at(.keyword(.else)) {
+      return true
+    }
+    // Condition terminator is start of statement body for `if` or `while` statements.
+    // Missing `else` is a common mistake for `guard` statements so we fall back to lookahead for a body.
+    return self.at(.leftBrace) && withLookahead({ $0.atStartOfConditionalStatementBody() })
   }
 
   /// Parse a condition element.
@@ -208,8 +231,7 @@ extension Parser {
       // However, if this is the first clause, and we see "x = y", then this is
       // almost certainly a typo for '==' and definitely not a continuation of
       // another clause, so parse it as an expression.  This also avoids
-      // lookahead + backtracking on simple if conditions that are obviously
-      // boolean conditions.
+      // lookahead on simple if conditions that are obviously boolean conditions.
       return .expression(self.parseExpression(flavor: .stmtCondition, pattern: .none))
     }
 
@@ -228,7 +250,11 @@ extension Parser {
       let letOrVar: RawTokenSyntax
 
       if self.at(.identifier), let lastBindingKind = lastBindingKind {
-        (unexpectedBeforeBindingKeyword, letOrVar) = self.expect(.keyword(.let), .keyword(.var), default: .keyword(Keyword(lastBindingKind.tokenText) ?? .let))
+        (unexpectedBeforeBindingKeyword, letOrVar) = self.expect(
+          .keyword(.let),
+          .keyword(.var),
+          default: .keyword(Keyword(lastBindingKind.tokenText) ?? .let)
+        )
       } else {
         letOrVar = self.consume(if: TokenSpec.keyword(.let), .keyword(.var)) ?? self.missingToken(.let)
         unexpectedBeforeBindingKeyword = nil
@@ -287,7 +313,7 @@ extension Parser {
           initializer: initializer
             ?? RawInitializerClauseSyntax(
               equal: RawTokenSyntax(missing: .equal, arena: self.arena),
-              value: RawExprSyntax(RawMissingExprSyntax(arena: self.arena)),
+              value: RawMissingExprSyntax(arena: self.arena),
               arena: self.arena
             ),
           arena: self.arena
@@ -304,7 +330,10 @@ extension Parser {
     let arguments = self.parseAvailabilitySpecList()
     let (unexpectedBeforeRParen, rparen) = self.expect(.rightParen)
     let unexpectedAfterRParen: RawUnexpectedNodesSyntax?
-    if let (equalOperator, falseKeyword) = self.consume(if: { $0.isContextualPunctuator("==") }, followedBy: { TokenSpec.keyword(.false) ~= $0 }) {
+    if let (equalOperator, falseKeyword) = self.consume(
+      if: { $0.isContextualPunctuator("==") },
+      followedBy: { TokenSpec.keyword(.false) ~= $0 }
+    ) {
       unexpectedAfterRParen = RawUnexpectedNodesSyntax([equalOperator, falseKeyword], arena: self.arena)
     } else {
       unexpectedAfterRParen = nil
@@ -486,12 +515,11 @@ extension Parser {
   mutating func parseWhileStatement(whileHandle: RecoveryConsumptionHandle) -> RawWhileStmtSyntax {
     let (unexpectedBeforeWhileKeyword, whileKeyword) = self.eat(whileHandle)
     let conditions: RawConditionElementListSyntax
-
     if self.at(.leftBrace) {
       conditions = RawConditionElementListSyntax(
         elements: [
           RawConditionElementSyntax(
-            condition: .expression(RawExprSyntax(RawMissingExprSyntax(arena: self.arena))),
+            condition: .init(expression: RawMissingExprSyntax(arena: self.arena)),
             trailingComma: nil,
             arena: self.arena
           )
@@ -499,9 +527,11 @@ extension Parser {
         arena: self.arena
       )
     } else {
-      conditions = self.parseConditionList()
+      conditions = self.parseConditionList(isGuardStatement: false)
     }
+
     let body = self.parseCodeBlock(introducer: whileKeyword)
+
     return RawWhileStmtSyntax(
       unexpectedBeforeWhileKeyword,
       whileKeyword: whileKeyword,
@@ -740,7 +770,7 @@ extension Parser {
         )
       )
     } else {
-      yieldedExpressions = .single(self.parseExpression(flavor: .basic, pattern: .none))
+      yieldedExpressions = .init(single: self.parseExpression(flavor: .basic, pattern: .none))
     }
 
     return RawYieldStmtSyntax(
@@ -874,7 +904,9 @@ extension Parser.Lookahead {
   /// - Note: This function must be kept in sync with `parseStatement()`.
   /// - Seealso: ``Parser/parseStatement()``
   mutating func atStartOfStatement(allowRecovery: Bool = false, preferExpr: Bool) -> Bool {
-    if (self.at(anyIn: SwitchCaseStart.self) != nil || self.at(.atSign)) && withLookahead({ $0.atStartOfSwitchCaseItem() }) {
+    if (self.at(anyIn: SwitchCaseStart.self) != nil || self.at(.atSign))
+      && withLookahead({ $0.atStartOfSwitchCaseItem() })
+    {
       // We consider SwitchCaseItems statements so we don't parse the start of a new case item as trailing parts of an expression.
       return true
     }
@@ -1039,4 +1071,54 @@ extension Parser.Lookahead {
     } while lookahead.at(.poundIf, .poundElseif, .poundElse) && lookahead.hasProgressed(&loopProgress)
     return lookahead.atStartOfSwitchCase()
   }
+
+  /// Returns `true` if the current token represents the start of an `if` or `while` statement body.
+  mutating func atStartOfConditionalStatementBody() -> Bool {
+    guard at(.leftBrace) else {
+      // Statement bodies always start with a '{'. If there is no '{', we can't be at the statement body.
+      return false
+    }
+    skipSingle()
+    if self.at(.endOfFile) {
+      // There's nothing else in the source file that could be the statement body, so this must be it.
+      return true
+    }
+    if self.at(.semicolon) {
+      // We can't have a semicolon between the condition and the statement body, so this must be the statement body.
+      return true
+    }
+    if self.at(.keyword(.else)) {
+      // If the current token is an `else` keyword, this must be the statement body of an `if` statement since conditions can't be followed by `else`.
+      return true
+    }
+    if self.at(.rightBrace, .rightParen) {
+      // A right brace or parenthesis cannot start a statement body, nor can the condition list continue afterwards. So, this must be the statement body.
+      // This covers cases like `if true, { if true, { } }` or `( if true, { print(0) } )`. While the latter is not valid code, it improves diagnostics.
+      return true
+    }
+    if self.atStartOfLine {
+      // If the current token is at the start of a line, it is most likely a statement body. The only exceptions are:
+      if self.at(.comma) {
+        // If newline begins with ',' it must be a condition trailing comma, so this can't be the statement body, e.g.
+        // if true, { true }
+        // , true { print("body") }
+        return false
+      }
+      if self.at(.binaryOperator) {
+        // If current token is a binary operator this can't be the statement body since an `if` expression can't be the left-hand side of an operator, e.g.
+        // if true, { true }
+        // != nil
+        // {
+        //   print("body")
+        // }
+        return false
+      }
+      // Excluded the above exceptions, this must be the statement body.
+      return true
+    } else {
+      // If the current token isn't at the start of a line and isn't `EOF`, `;`, `else`, `)` or `}` this can't be the statement body.
+      return false
+    }
+  }
+
 }

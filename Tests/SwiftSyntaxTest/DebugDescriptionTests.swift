@@ -22,7 +22,7 @@ private extension String {
   }
 }
 
-public class DebugDescriptionTests: XCTestCase {
+class DebugDescriptionTests: XCTestCase {
   public func testDump() {
     struct TestCase {
       let syntax: Any
@@ -171,6 +171,7 @@ public class DebugDescriptionTests: XCTestCase {
 
   #if DEBUG
   // debugInitCall is only available in debug builds, so we can only test it in those.
+  // swift-format-ignore
   @available(*, deprecated, message: "Purposefully tests debugInitCall, which is marked deprecated for debugger use only")
   func testDebugInitCall() {
     let sourceFile: SourceFileSyntax = """

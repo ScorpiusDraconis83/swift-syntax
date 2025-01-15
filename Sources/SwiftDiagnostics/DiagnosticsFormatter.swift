@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 extension Sequence where Element == Range<Int> {
   /// Given a set of ranges that are sorted in order of nondecreasing lower
@@ -67,6 +71,22 @@ public struct DiagnosticsFormatter {
     /// Whether this line is free of annotations.
     var isFreeOfAnnotations: Bool {
       return diagnostics.isEmpty && suffixText.isEmpty
+    }
+
+    /// Converts a UTF-8 column index into an index that considers each character as a single column, not each UTF-8
+    /// byte.
+    ///
+    /// For example the 👨‍👩‍👧‍👦 character is considered as a single character, not 25 bytes.
+    ///
+    /// Both the input and the output column are 1-based.
+    func characterColumn(ofUtf8Column utf8Column: Int) -> Int {
+      let index =
+        sourceString.utf8.index(
+          sourceString.utf8.startIndex,
+          offsetBy: utf8Column - 1,
+          limitedBy: sourceString.utf8.endIndex
+        ) ?? sourceString.utf8.endIndex
+      return sourceString.distance(from: sourceString.startIndex, to: index) + 1
     }
   }
 
@@ -139,7 +159,7 @@ public struct DiagnosticsFormatter {
 
       let endColumn: Int
       if endLine > lineNumber {
-        endColumn = annotatedLine.sourceString.count
+        endColumn = annotatedLine.sourceString.utf8.count
       } else if endLine == lineNumber {
         endColumn = endLoc.column
       } else {
@@ -212,7 +232,9 @@ public struct DiagnosticsFormatter {
         return nil
       }.joined()
 
-      annotatedSourceLines.append(AnnotatedSourceLine(diagnostics: diagsForLine, sourceString: sourceLine, suffixText: suffixText))
+      annotatedSourceLines.append(
+        AnnotatedSourceLine(diagnostics: diagsForLine, sourceString: sourceLine, suffixText: suffixText)
+      )
     }
 
     // Only lines with diagnostic messages should be printed, but including some context
@@ -246,11 +268,13 @@ public struct DiagnosticsFormatter {
       // line numbers should be right aligned
       let lineNumberString = String(lineNumber)
       let leadingSpaces = String(repeating: " ", count: maxNumberOfDigits - lineNumberString.count)
-      let linePrefix = "\(leadingSpaces)\(diagnosticDecorator.decorateBufferOutline("\(lineNumberString) │")) "
+      let linePrefix = "\(leadingSpaces)\(diagnosticDecorator.decorateBufferOutline("\(lineNumberString) |")) "
 
       // If necessary, print a line that indicates that there was lines skipped in the source code
       if hasLineBeenSkipped && !annotatedSource.isEmpty {
-        let lineMissingInfoLine = indentString + String(repeating: " ", count: maxNumberOfDigits) + " \(diagnosticDecorator.decorateBufferOutline("┆"))"
+        let lineMissingInfoLine =
+          indentString + String(repeating: " ", count: maxNumberOfDigits)
+          + " \(diagnosticDecorator.decorateBufferOutline(":"))"
         annotatedSource.append("\(lineMissingInfoLine)\n")
       }
       hasLineBeenSkipped = false
@@ -274,28 +298,36 @@ public struct DiagnosticsFormatter {
         annotatedSource.append("\n")
       }
 
-      let columnsWithDiagnostics = Set(annotatedLine.diagnostics.map { $0.location(converter: slc).column })
+      let columnsWithDiagnostics = Set(
+        annotatedLine.diagnostics.map {
+          annotatedLine.characterColumn(ofUtf8Column: $0.location(converter: slc).column)
+        }
+      )
       let diagsPerColumn = Dictionary(grouping: annotatedLine.diagnostics) { diag in
-        diag.location(converter: slc).column
+        annotatedLine.characterColumn(ofUtf8Column: diag.location(converter: slc).column)
       }.sorted { lhs, rhs in
         lhs.key > rhs.key
       }
 
       for (column, diags) in diagsPerColumn {
         // compute the string that is shown before each message
-        var preMessage = indentString + String(repeating: " ", count: maxNumberOfDigits) + " " + diagnosticDecorator.decorateBufferOutline("│")
+        var preMessage =
+          indentString + String(repeating: " ", count: maxNumberOfDigits) + " "
+          + diagnosticDecorator.decorateBufferOutline("|")
         for c in 0..<column {
           if columnsWithDiagnostics.contains(c) {
-            preMessage.append("│")
+            preMessage.append("|")
           } else {
             preMessage.append(" ")
           }
         }
 
         for diag in diags.dropLast(1) {
-          annotatedSource.append("\(preMessage)├─ \(diagnosticDecorator.decorateDiagnosticMessage(diag.diagMessage))\n")
+          annotatedSource.append("\(preMessage)|- \(diagnosticDecorator.decorateDiagnosticMessage(diag.diagMessage))\n")
         }
-        annotatedSource.append("\(preMessage)╰─ \(diagnosticDecorator.decorateDiagnosticMessage(diags.last!.diagMessage))\n")
+        annotatedSource.append(
+          "\(preMessage)`- \(diagnosticDecorator.decorateDiagnosticMessage(diags.last!.diagMessage))\n"
+        )
       }
 
       // Add suffix text.

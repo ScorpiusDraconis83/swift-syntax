@@ -10,11 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
-public extension SyntaxProtocol {
+extension SyntaxProtocol {
   /// Build a syntax node from this `Buildable` and format it with the given format.
-  func formatted(using format: BasicFormat = BasicFormat()) -> Syntax {
+  public func formatted(using format: BasicFormat = BasicFormat()) -> Syntax {
+    format.reset()
     return format.rewrite(self)
   }
 }

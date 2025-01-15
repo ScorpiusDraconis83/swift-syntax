@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension TokenKind {
   var nameForDiagnostics: String {
@@ -117,6 +121,9 @@ extension TokenKind {
       return "wildcard"
     case .keyword(let keyword):
       return String(syntaxText: keyword.defaultText)
+    #if RESILIENT_LIBRARIES
+    @unknown default:fatalError()
+    #endif
     }
   }
 }

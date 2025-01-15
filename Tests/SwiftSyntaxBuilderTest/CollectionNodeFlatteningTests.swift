@@ -15,16 +15,17 @@ import SwiftSyntaxBuilder
 import XCTest
 
 final class CollectionNodeFlatteningTests: XCTestCase {
-  func test_FlattenCodeBlockItemListWithBuilder() {
+  func testFlattenCodeBlockItemListWithBuilder() {
     @CodeBlockItemListBuilder
     func buildInnerCodeBlockItemList() -> CodeBlockItemListSyntax {
-      FunctionCallExprSyntax(callee: ExprSyntax("innerBuilder"))
+      [ExprSyntax("innerBuilder1"), ExprSyntax("innerBuilder2")].lazy.map {
+        FunctionCallExprSyntax(callee: $0)
+      }
     }
 
     @CodeBlockItemListBuilder
     func buildOuterCodeBlockItemList() -> CodeBlockItemListSyntax {
       FunctionCallExprSyntax(callee: ExprSyntax("outerBuilder"))
-
       buildInnerCodeBlockItemList()
     }
 
@@ -39,13 +40,14 @@ final class CollectionNodeFlatteningTests: XCTestCase {
       {
           outsideBuilder()
           outerBuilder()
-          innerBuilder()
+          innerBuilder1()
+          innerBuilder2()
       }
       """
     )
   }
 
-  func test_FlattenCodeBlockItemListWithCodeBlockItemStrings() {
+  func testFlattenCodeBlockItemListWithCodeBlockItemStrings() {
     let buildable = CodeBlockItemListSyntax {
       "let one = object.methodOne()"
       "let two = object.methodTwo()"
@@ -59,4 +61,62 @@ final class CollectionNodeFlatteningTests: XCTestCase {
       """
     )
   }
+
+  func testFlattenCodeBlockItemListWithCodeBlockItemStringArray() {
+    let buildable = CodeBlockItemListSyntax {
+      ["let one = object.methodOne()", "let two = object.methodTwo()"]
+    }
+
+    assertBuildResult(
+      buildable,
+      """
+      let one = object.methodOne()
+      let two = object.methodTwo()
+      """
+    )
+  }
+
+  func testFlattenCodeBlockItemListWithCodeBlockInterpolated() {
+    let block = CodeBlockItemListSyntax {
+      "let a = 1"
+      "let b = 2"
+      "let c = 3"
+    }
+
+    let buildable = CodeBlockItemListSyntax {
+      "let one = object.methodOne()"
+      "let two = object.methodTwo()"
+      "let three = {\(block)}()"
+    }
+
+    assertBuildResult(
+      buildable,
+      """
+      let one = object.methodOne()
+      let two = object.methodTwo()
+      let three = {
+          let a = 1
+          let b = 2
+          let c = 3
+      }()
+      """
+    )
+  }
+
+  func testFlattenCodeBlockItemListWithTrailingNewline() {
+    let buildable = CodeBlockItemListSyntax {
+      DeclSyntax("let a = 1").with(\.trailingTrivia, .newline)
+      DeclSyntax("let b = 2").with(\.trailingTrivia, .newline)
+    }
+
+    assertBuildResult(
+      buildable,
+      """
+      let a = 1
+      let b = 2
+
+      """
+    )
+  }
+
 }

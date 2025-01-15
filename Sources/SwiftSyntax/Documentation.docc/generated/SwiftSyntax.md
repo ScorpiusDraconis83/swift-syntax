@@ -18,20 +18,12 @@ allows Swift tools to parse, inspect, generate, and transform Swift source code.
 
 - <doc:Working-with-SwiftSyntax>
 - <doc:Macro-Versioning>
+- <doc:RawSyntaxValidation>
 - <doc:Glossary>
 
 ### Tutorials
 
 - <doc:Tutorial-Table-of-Contents>
-
-### Contributing
-
-These articles are intended for developers wishing to contribute to SwiftSyntax
-
-- <doc:ChangingSwiftSyntax>
-- <doc:Existentials>
-- <doc:SPI>
-- <doc:Swift-Version>
 
 ### Syntax
 
@@ -102,8 +94,6 @@ These articles are intended for developers wishing to contribute to SwiftSyntax
 - <doc:SwiftSyntax/BinaryOperatorExprSyntax>
 - <doc:SwiftSyntax/BooleanLiteralExprSyntax>
 - <doc:SwiftSyntax/BorrowExprSyntax>
-- <doc:SwiftSyntax/CanImportExprSyntax>
-- <doc:SwiftSyntax/CanImportVersionInfoSyntax>
 - <doc:SwiftSyntax/ClosureExprSyntax>
 - <doc:SwiftSyntax/ConsumeExprSyntax>
 - <doc:SwiftSyntax/CopyExprSyntax>
@@ -301,6 +291,8 @@ These articles are intended for developers wishing to contribute to SwiftSyntax
 - <doc:SwiftSyntax/TuplePatternElementSyntax>
 - <doc:SwiftSyntax/TupleTypeElementListSyntax>
 - <doc:SwiftSyntax/TupleTypeElementSyntax>
+- <doc:SwiftSyntax/TypeSpecifierListSyntax>
+- <doc:SwiftSyntax/SimpleTypeSpecifierSyntax>
 - <doc:SwiftSyntax/UnexpectedNodesSyntax>
 - <doc:SwiftSyntax/VersionComponentListSyntax>
 - <doc:SwiftSyntax/VersionComponentSyntax>
@@ -419,7 +411,6 @@ These articles are intended for developers wishing to contribute to SwiftSyntax
 ### Internals
 
 - <doc:SwiftSyntax/SyntaxProtocol>
-- <doc:SwiftSyntax/SyntaxArena>
 - <doc:SwiftSyntax/SyntaxEnum>
 - <doc:SwiftSyntax/SyntaxHashable>
 - <doc:SwiftSyntax/SyntaxIdentifier>

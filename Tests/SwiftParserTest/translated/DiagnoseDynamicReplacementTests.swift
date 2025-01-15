@@ -53,7 +53,10 @@ final class DiagnoseDynamicReplacementTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected argument for '@_dynamicReplacement' attribute", fixIts: ["insert attribute argument"]),
+        DiagnosticSpec(
+          message: "expected argument for '@_dynamicReplacement' attribute",
+          fixIts: ["insert attribute argument"]
+        ),
         DiagnosticSpec(
           message: "expected ')' to end attribute",
           notes: [NoteSpec(message: "to match this opening '('")],
@@ -72,7 +75,7 @@ final class DiagnoseDynamicReplacementTests: ParserTestCase {
   func testDiagnoseDynamicReplacement4() {
     assertParse(
       """
-      @_dynamicReplacementℹ️(for: dynamically_replaceable() 1️⃣
+      @_dynamicReplacementℹ️(for: dynamically_replaceable()1️⃣ 
       func test_dynamic_replacement_for3() {
       }
       """,

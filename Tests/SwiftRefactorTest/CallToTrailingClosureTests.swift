@@ -80,7 +80,7 @@ final class CallToTrailingClosuresTest: XCTestCase {
       """
 
     // TODO: The ident here is not great.
-    // https://github.com/apple/swift-syntax/issues/1473
+    // https://github.com/swiftlang/swift-syntax/issues/1473
     let expected: ExprSyntax = """
       foo({ label in
           return 1
@@ -217,13 +217,43 @@ final class CallToTrailingClosuresTest: XCTestCase {
 
     try assertRefactorCall(baseline, expected: expected)
   }
+
+  func testClosureWithArgumentLabel() throws {
+    try assertRefactorCall(
+      """
+      foo(arg: 1, closure: { someInt in
+
+      })
+      """,
+      expected: """
+        foo(arg: 1) { someInt in
+
+        }
+        """
+    )
+  }
+
+  func testCallHasInitialIndentationIndentation() throws {
+    try assertRefactorCall(
+      """
+          foo(arg: 1, closure: { someInt in
+              "abc"
+          })
+      """,
+      expected: """
+            foo(arg: 1) { someInt in
+                "abc"
+            }
+        """
+    )
+  }
 }
 
 fileprivate func assertRefactorCall(
   _ callExpr: ExprSyntax,
   startAtArgument: Int = 0,
   expected: ExprSyntax?,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) throws {
   try assertRefactor(

@@ -37,7 +37,10 @@ final class PoundAssertTests: ParserTestCase {
       #assert1️⃣ true2️⃣, "error message")
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "consecutive statements on a line must be separated by newline or ';'", fixIts: ["insert newline", "insert ';'"]),
+        DiagnosticSpec(
+          message: "consecutive statements on a line must be separated by newline or ';'",
+          fixIts: ["insert newline", "insert ';'"]
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: #"extraneous code ', "error message")' at top level"#),
       ],
       applyFixIts: ["insert newline"],
@@ -54,7 +57,10 @@ final class PoundAssertTests: ParserTestCase {
       #assert1️⃣ true2️⃣, "error message")
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "consecutive statements on a line must be separated by newline or ';'", fixIts: ["insert newline", "insert ';'"]),
+        DiagnosticSpec(
+          message: "consecutive statements on a line must be separated by newline or ';'",
+          fixIts: ["insert newline", "insert ';'"]
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: #"extraneous code ', "error message")' at top level"#),
       ],
       applyFixIts: ["insert ';'"],
@@ -82,7 +88,7 @@ final class PoundAssertTests: ParserTestCase {
     assertParse(
       """
       func unbalanced1() {
-        #assertℹ️(true 1️⃣
+        #assertℹ️(true1️⃣ 
       }
       """,
       diagnostics: [
@@ -106,7 +112,7 @@ final class PoundAssertTests: ParserTestCase {
     assertParse(
       #"""
       func unbalanced2() {
-        #assertℹ️(true, "hello world" 1️⃣
+        #assertℹ️(true, "hello world"1️⃣ 
       }
       """#,
       diagnostics: [

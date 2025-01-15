@@ -57,7 +57,15 @@ public let PATTERN_NODES: [Node] = [
     children: [
       Child(
         name: "identifier",
-        kind: .token(choices: [.token(.identifier), .keyword(.self), .keyword(.`init`)])
+        kind: .token(
+          choices: [
+            .token(.identifier),
+            .keyword(.self),
+            .keyword(.`init`),
+            .keyword(.`deinit`),
+            .keyword(.`subscript`),
+          ]
+        )
       )
     ]
   ),
@@ -101,7 +109,6 @@ public let PATTERN_NODES: [Node] = [
     children: [
       Child(
         name: "label",
-        deprecatedName: "labelName",
         kind: .token(choices: [.token(.identifier)]),
         nameForDiagnostics: "label",
         documentation: "The label of the pattern.",
@@ -109,7 +116,6 @@ public let PATTERN_NODES: [Node] = [
       ),
       Child(
         name: "colon",
-        deprecatedName: "labelColon",
         kind: .token(choices: [.token(.colon)]),
         documentation: "The colon separating label and pattern.",
         isOptional: true
@@ -125,6 +131,12 @@ public let PATTERN_NODES: [Node] = [
         documentation: "The comma separating elements.",
         isOptional: true
       ),
+    ],
+    childHistory: [
+      [
+        "label": .renamed(from: "labelName"),
+        "colon": .renamed(from: "labelColon"),
+      ]
     ]
   ),
 
@@ -189,17 +201,22 @@ public let PATTERN_NODES: [Node] = [
     children: [
       Child(
         name: "bindingSpecifier",
-        deprecatedName: "bindingKeyword",
         kind: .token(choices: [
           .keyword(.let), .keyword(.var), .keyword(.inout),
           .keyword(._mutating), .keyword(._borrowing), .keyword(._consuming),
+          .keyword(.borrowing),
         ])
       ),
       Child(
         name: "pattern",
-        deprecatedName: "valuePattern",
         kind: .node(kind: .pattern)
       ),
+    ],
+    childHistory: [
+      [
+        "bindingSpecifier": .renamed(from: "bindingKeyword"),
+        "pattern": .renamed(from: "valuePattern"),
+      ]
     ]
   ),
 
@@ -212,7 +229,7 @@ public let PATTERN_NODES: [Node] = [
 
       ### Examples
 
-      ``WildcardPattern`` matches and ignores any value.
+      ``WildcardPatternSyntax`` matches and ignores any value.
       For example `_` in the example:
 
       ```swift

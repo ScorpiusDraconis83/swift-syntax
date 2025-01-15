@@ -14,9 +14,9 @@
 
 extension Parser {
   @_spi(ExperimentalLanguageFeatures)
-  public struct ExperimentalFeatures: OptionSet {
+  public struct ExperimentalFeatures: OptionSet, Sendable {
     public let rawValue: UInt
-    
+
     public init(rawValue: UInt) {
       self.rawValue = rawValue
     }
@@ -26,16 +26,55 @@ extension Parser {
 extension Parser.ExperimentalFeatures {
   /// Whether to enable the parsing of reference bindings.
   public static let referenceBindings = Self (rawValue: 1 << 0)
-  
+
   /// Whether to enable the parsing of 'then' statements.
   public static let thenStatements = Self (rawValue: 1 << 1)
-  
+
   /// Whether to enable the parsing of 'do' expressions.
   public static let doExpressions = Self (rawValue: 1 << 2)
-  
-  /// Whether to enable the parsing of NonEscableTypes.
+
+  /// Whether to enable the parsing of non-escapable types.
   public static let nonescapableTypes = Self (rawValue: 1 << 3)
-  
-  /// Whether to enable the parsing of TransferringArgsAndResults.
-  public static let transferringArgsAndResults = Self (rawValue: 1 << 4)
+
+  /// Whether to enable the parsing of trailing commas.
+  public static let trailingComma = Self (rawValue: 1 << 4)
+
+  /// Whether to enable the parsing of coroutine accessors.
+  public static let coroutineAccessors = Self (rawValue: 1 << 5)
+
+  /// Whether to enable the parsing of value generics.
+  public static let valueGenerics = Self (rawValue: 1 << 6)
+
+  /// Whether to enable the parsing of @abi attribute.
+  public static let abiAttribute = Self (rawValue: 1 << 7)
+
+  /// Whether to enable the parsing of 'unsafe' expression.
+  public static let unsafeExpression = Self (rawValue: 1 << 8)
+
+  /// Creates a new value representing the experimental feature with the
+  /// given name, or returns nil if the name is not recognized.
+  public init?(name: String) {
+    switch name {
+    case "ReferenceBindings":
+      self = .referenceBindings
+    case "ThenStatements":
+      self = .thenStatements
+    case "DoExpressions":
+      self = .doExpressions
+    case "NonescapableTypes":
+      self = .nonescapableTypes
+    case "TrailingComma":
+      self = .trailingComma
+    case "CoroutineAccessors":
+      self = .coroutineAccessors
+    case "ValueGenerics":
+      self = .valueGenerics
+    case "ABIAttribute":
+      self = .abiAttribute
+    case "WarnUnsafe":
+      self = .unsafeExpression
+    default:
+      return nil
+    }
+  }
 }

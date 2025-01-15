@@ -24,7 +24,7 @@ class SigIntListener {
   /// Registers a `SIGINT` signal handler that forwards `SIGINT` to all
   /// subprocesses that are registered in `runningSubprocesses`
   static func registerSigIntSubprocessTerminationHandler() {
-    #if canImport(Darwin) || canImport(Glibc)
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Bionic)
     signal(SIGINT) { _ in
       SigIntListener.hasReceivedSigInt = true
       for process in SigIntListener.runningSubprocesses {
@@ -120,7 +120,7 @@ class ProcessRunner {
       // Apparently using availableData can cause various issues
       let newData = fileHandle.readData(ofLength: Int.max)
       if newData.count == 0 {
-        pipe.fileHandleForReading.readabilityHandler = nil;
+        pipe.fileHandleForReading.readabilityHandler = nil
         group.leave()
       } else {
         addData(newData)

@@ -13,8 +13,10 @@ add_swift_syntax_library(SwiftParser
   CollectionNodes+Parsable.swift
   Declarations.swift
   Directives.swift
+  ExpressionInterpretedAsVersionTuple.swift
   Expressions.swift
   IncrementalParseTransition.swift
+  IsValidIdentifier.swift
   Lookahead.swift
   LoopProgressCondition.swift
   Modifiers.swift
@@ -29,8 +31,9 @@ add_swift_syntax_library(SwiftParser
   Recovery.swift
   Specifiers.swift
   Statements.swift
-  StringLiterals.swift
   StringLiteralRepresentedLiteralValue.swift
+  StringLiterals.swift
+  SwiftVersion.swift
   SyntaxUtils.swift
   TokenConsumer.swift
   TokenPrecedence.swift

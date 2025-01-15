@@ -8,7 +8,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Describes a macro that forms code items in a function or closure body.
 public protocol CodeItemMacro: FreestandingMacro {

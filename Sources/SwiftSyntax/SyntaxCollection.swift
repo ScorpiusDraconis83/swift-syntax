@@ -49,7 +49,7 @@ extension SyntaxCollection {
         arena: arena
       )
     }
-    self = Syntax.forRoot(raw, rawNodeArena: arena).cast(Self.self)
+    self = Syntax.forRoot(raw, rawNodeArena: RetainedSyntaxArena(arena)).cast(Self.self)
   }
 
   public init(arrayLiteral elements: Element...) {
@@ -70,7 +70,9 @@ extension SyntaxCollection {
   internal func replacingLayout(_ layout: [RawSyntax?]) -> Self {
     let arena = SyntaxArena()
     let newRaw = layoutView.replacingLayout(with: layout, arena: arena)
-    return Syntax(self).replacingSelf(newRaw, rawNodeArena: arena, allocationArena: arena).cast(Self.self)
+    return Syntax(self)
+      .replacingSelf(newRaw, rawNodeArena: RetainedSyntaxArena(arena), allocationArena: arena)
+      .cast(Self.self)
   }
 
   /// Return the index of `node` within this collection.
@@ -124,6 +126,7 @@ extension SyntaxCollection {
   ///
   /// - Parameter syntax: The element to append.
   /// - Returns: A new collection with that element appended to the end.
+  // swift-format-ignore
   @available(*, deprecated, message: "Create a new array of elements and construct a new collection type from those elements")
   public func appending(_ syntax: Element) -> Self {
     var newLayout = layoutView.formLayoutArray()
@@ -137,6 +140,7 @@ extension SyntaxCollection {
   /// - Parameter syntax: The element to prepend.
   /// - Returns: A new collection with that element prepended to the
   ///            beginning.
+  // swift-format-ignore
   @available(*, deprecated, message: "Create a new array of elements and construct a new collection type from those elements")
   public func prepending(_ syntax: Element) -> Self {
     return inserting(syntax, at: 0)
@@ -150,6 +154,7 @@ extension SyntaxCollection {
   ///   - index: The index at which to insert the element in the collection.
   ///
   /// - Returns: A new collection with that element appended to the end.
+  // swift-format-ignore
   @available(*, deprecated, message: "Create a new array of elements and construct a new collection type from those elements")
   public func inserting(_ syntax: Element, at index: Int) -> Self {
     var newLayout = layoutView.formLayoutArray()
@@ -188,6 +193,7 @@ extension SyntaxCollection {
   /// - Parameter index: The index of the element to remove from the collection.
   /// - Returns: A new collection with the element at the provided index
   ///            removed.
+  // swift-format-ignore
   @available(*, deprecated, message: "Use filter to remove unwanted elements and construct a new collection type from the filtered elements")
   public func removing(childAt index: Int) -> Self {
     var newLayout = layoutView.formLayoutArray()
@@ -218,22 +224,33 @@ extension SyntaxCollection {
 
 /// An iterator over a ``SyntaxCollection``.
 public struct SyntaxCollectionIterator<E: SyntaxProtocol>: IteratorProtocol {
-  private let parent: Syntax
   public typealias Element = E
 
-  private var iterator: RawSyntaxChildren.Iterator
+  /// The arena in which `SyntaxData` get allocated as the children are traversed.
+  private let arena: SyntaxDataArena
 
-  init(parent: Syntax, rawChildren: RawSyntaxChildren) {
-    self.parent = parent
-    self.iterator = rawChildren.makeIterator()
+  /// The buffer containing the children that are iterated by this iterator.
+  private let layoutBuffer: SyntaxDataReferenceBuffer
+
+  /// The index in `layoutBuffer` that will be returned when `next` is called.
+  private var index: Int
+
+  init<Node: SyntaxCollection>(_ node: Node) where Node.Element == Element {
+    let syntax = Syntax(node)
+    self.arena = syntax.arena
+    self.layoutBuffer = syntax.layoutBuffer
+    self.index = layoutBuffer.startIndex
   }
 
   public mutating func next() -> Element? {
-    guard let (raw, info) = self.iterator.next() else {
+    guard self.index < self.layoutBuffer.count else {
       return nil
     }
-    let absoluteRaw = AbsoluteRawSyntax(raw: raw!, info: info)
-    return Syntax(absoluteRaw, parent: parent).cast(Element.self)
+    defer {
+      self.index += 1
+    }
+    // 'SyntaxCollection' always has non-nil children. We can thus force-unwrap the element at 'index'.
+    return Syntax(arena: arena, dataRef: layoutBuffer[self.index]!).cast(Element.self)
   }
 }
 
@@ -257,8 +274,8 @@ extension SyntaxCollection {
     // Keep `newElements` alive so their arena doesn't get deallocated.
     withExtendedLifetime(newElements) {
       var newLayout = layoutView.formLayoutArray()
-      let layoutRangeLowerBound = (subrange.lowerBound.data?.indexInParent).map(Int.init) ?? newLayout.endIndex
-      let layoutRangeUpperBound = (subrange.upperBound.data?.indexInParent).map(Int.init) ?? newLayout.endIndex
+      let layoutRangeLowerBound = subrange.lowerBound.value
+      let layoutRangeUpperBound = subrange.upperBound.value
       newLayout.replaceSubrange(layoutRangeLowerBound..<layoutRangeUpperBound, with: newElements.map { $0.raw })
       self = replacingLayout(newLayout)
     }
@@ -404,46 +421,40 @@ extension SyntaxCollection {
 /// Conformance to `BidirectionalCollection`.
 extension SyntaxCollection {
   public func makeIterator() -> SyntaxCollectionIterator<Element> {
-    return SyntaxCollectionIterator<Element>(parent: Syntax(self), rawChildren: rawChildren)
+    return SyntaxCollectionIterator(self)
   }
 
-  private var rawChildren: RawSyntaxChildren {
-    // We know children in a syntax collection cannot be missing. So we can
-    // use the low-level and faster RawSyntaxChildren collection instead of
-    // NonNilRawSyntaxChildren.
-    return RawSyntaxChildren(Syntax(self).absoluteRaw)
+  var elements: SyntaxDataReferenceBuffer {
+    Syntax(self).layoutBuffer
   }
 
   public var startIndex: SyntaxChildrenIndex {
-    return rawChildren.startIndex
+    return SyntaxChildrenIndex(value: 0)
   }
 
   public var endIndex: SyntaxChildrenIndex {
-    return rawChildren.endIndex
+    return SyntaxChildrenIndex(value: elements.count)
   }
 
   public func index(after index: SyntaxChildrenIndex) -> SyntaxChildrenIndex {
-    return rawChildren.index(after: index)
+    return Index(value: elements.index(after: index.value))
   }
 
   public func index(before index: SyntaxChildrenIndex) -> SyntaxChildrenIndex {
-    return rawChildren.index(before: index)
+    return Index(value: elements.index(before: index.value))
   }
 
   public func distance(from start: SyntaxChildrenIndex, to end: SyntaxChildrenIndex) -> Int {
-    return rawChildren.distance(from: start, to: end)
+    return elements.distance(from: start.value, to: end.value)
   }
 
   public subscript(position: SyntaxChildrenIndex) -> Element {
     get {
-      let (raw, info) = rawChildren[position]
-      let absoluteRaw = AbsoluteRawSyntax(raw: raw!, info: info)
-      return Syntax(absoluteRaw, parent: Syntax(self)).cast(Element.self)
+      // 'SyntaxCollection' always has non-nil children. We can thus force-unwrap the element at 'position.value'
+      return Syntax(arena: Syntax(self).arena, dataRef: elements[position.value]!).cast(Element.self)
     }
     set {
-      guard let indexToReplace = (position.data?.indexInParent).map(Int.init) else {
-        preconditionFailure("Cannot replace element at the end index")
-      }
+      let indexToReplace = position.value
       var newLayout = layoutView.formLayoutArray()
       /// Make sure the index is a valid index for replacing
       precondition(

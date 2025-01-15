@@ -17,9 +17,12 @@ import SwiftSyntaxBuilder
 ///
 /// Using the cases of this enum, children of syntax nodes can refer the syntax
 /// node that defines their layout.
-public enum SyntaxNodeKind: String, CaseIterable {
+public enum SyntaxNodeKind: String, CaseIterable, IdentifierConvertible, TypeConvertible {
   // Please keep this list sorted alphabetically
 
+  case _canImportExpr
+  case _canImportVersionInfo
+  case abiAttributeArguments
   case accessorBlock
   case accessorDecl
   case accessorDeclList
@@ -47,8 +50,6 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case booleanLiteralExpr
   case borrowExpr
   case breakStmt
-  case canImportExpr
-  case canImportVersionInfo
   case catchClause
   case catchClauseList
   case catchItem
@@ -99,8 +100,8 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case dictionaryExpr
   case dictionaryType
   case differentiabilityArgument
-  case differentiabilityArguments
   case differentiabilityArgumentList
+  case differentiabilityArguments
   case differentiabilityWithRespectToArgument
   case differentiableAttributeArguments
   case discardAssignmentExpr
@@ -182,6 +183,9 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case labeledSpecializeArgument
   case labeledStmt
   case layoutRequirement
+  case lifetimeSpecifierArgument
+  case lifetimeSpecifierArgumentList
+  case lifetimeTypeSpecifier
   case macroDecl
   case macroExpansionDecl
   case macroExpansionExpr
@@ -244,14 +248,15 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case returnStmt
   case sameTypeRequirement
   case sequenceExpr
+  case simpleTypeSpecifier
+  case simpleStringLiteralExpr
+  case simpleStringLiteralSegmentList
   case someOrAnyType
   case sourceFile
   case specializeAttributeArgumentList
   case specializeAvailabilityArgument
   case specializeTargetFunctionArgument
   case stmt
-  case simpleStringLiteralExpr
-  case simpleStringLiteralSegmentList
   case stringLiteralExpr
   case stringLiteralSegmentList
   case stringSegment
@@ -285,12 +290,16 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case typeEffectSpecifiers
   case typeExpr
   case typeInitializerClause
+  case typeSpecifier
+  case lifetimeSpecifierArguments
+  case typeSpecifierList
   case unavailableFromAsyncAttributeArguments
   case underscorePrivateAttributeArguments
   case unexpectedNodes
   case unresolvedAsExpr
   case unresolvedIsExpr
   case unresolvedTernaryExpr
+  case unsafeExpr
   case valueBindingPattern
   case variableDecl
   case versionComponent
@@ -299,10 +308,10 @@ public enum SyntaxNodeKind: String, CaseIterable {
   case whereClause
   case whileStmt
   case wildcardPattern
-  case yieldStmt
   case yieldedExpression
-  case yieldedExpressionsClause
   case yieldedExpressionList
+  case yieldedExpressionsClause
+  case yieldStmt
 
   // Nodes that have special handling throughout the codebase
 
@@ -320,7 +329,6 @@ public enum SyntaxNodeKind: String, CaseIterable {
     }
   }
 
-  /// Whether this is one of the syntax base nodes.
   public var isBase: Bool {
     switch self {
     case .decl, .expr, .pattern, .stmt, .syntax, .syntaxCollection, .type:
@@ -330,13 +338,19 @@ public enum SyntaxNodeKind: String, CaseIterable {
     }
   }
 
-  /// A name for this node that is suitable to be used as a variables or enum
-  /// case's name.
-  public var varOrCaseName: TokenSyntax {
+  public var identifier: TokenSyntax {
     return .identifier(rawValue)
   }
 
-  /// The type name of this node in the SwiftSyntax module.
+  public var uppercasedFirstWordRawValue: String {
+    switch self {
+    case .abiAttributeArguments:
+      "ABIAttributeArguments"
+    default:
+      rawValue.withFirstCharacterUppercased
+    }
+  }
+
   public var syntaxType: TypeSyntax {
     switch self {
     case .syntax:
@@ -344,30 +358,22 @@ public enum SyntaxNodeKind: String, CaseIterable {
     case .syntaxCollection:
       return "SyntaxCollection"
     default:
-      return "\(raw: rawValue.withFirstCharacterUppercased)Syntax"
+      return "\(raw: uppercasedFirstWordRawValue)Syntax"
     }
   }
 
-  /// For base nodes, the name of the corresponding protocol to which all the
-  /// concrete nodes that have this base kind, conform.
+  public var isAvailableInDocc: Bool {
+    if let node = SYNTAX_NODE_MAP[self], node.isExperimental {
+      return false
+    } else if isDeprecated {
+      return false
+    } else {
+      return true
+    }
+  }
+
   public var protocolType: TypeSyntax {
     return "\(syntaxType)Protocol"
-  }
-
-  /// The name of this node at the `RawSyntax` level.
-  public var rawType: TypeSyntax {
-    return "Raw\(syntaxType)"
-  }
-
-  /// For base nodes, the name of the corresponding raw protocol to which all the
-  /// concrete raw nodes that have this base kind, conform.
-  public var rawProtocolType: TypeSyntax {
-    switch self {
-    case .syntax, .syntaxCollection:
-      return "RawSyntaxNodeProtocol"
-    default:
-      return "Raw\(raw: rawValue.withFirstCharacterUppercased)SyntaxNodeProtocol"
-    }
   }
 
   /// For base node types, generates the name of the protocol to which all
@@ -387,6 +393,8 @@ public enum SyntaxNodeKind: String, CaseIterable {
   /// deprecated.
   public var deprecatedRawValue: String? {
     switch self {
+    case ._canImportExpr: return "canImportExpr"
+    case ._canImportVersionInfo: return "canImportVersionInfo"
     case .accessorDeclList: return "accessorList"
     case .accessorParameters: return "accessorParameter"
     case .associatedTypeDecl: return "associatedtypeDecl"
@@ -405,8 +413,8 @@ public enum SyntaxNodeKind: String, CaseIterable {
     case .derivativeAttributeArguments: return "derivativeRegistrationAttributeArguments"
     case .designatedType: return "designatedTypeElement"
     case .differentiabilityArgument: return "differentiabilityParam"
-    case .differentiabilityArguments: return "differentiabilityParams"
     case .differentiabilityArgumentList: return "differentiabilityParamList"
+    case .differentiabilityArguments: return "differentiabilityParams"
     case .differentiabilityWithRespectToArgument: return "differentiabilityParamsClause"
     case .documentationAttributeArgumentList: return "documentationAttributeArguments"
     case .dynamicReplacementAttributeArguments: return "dynamicReplacementArguments"
@@ -440,6 +448,7 @@ public enum SyntaxNodeKind: String, CaseIterable {
     case .precedenceGroupName: return "precedenceGroupNameElement"
     case .repeatStmt: return "repeatWhileStmt"
     case .someOrAnyType: return "constrainedSugarType"
+    case .simpleTypeSpecifier: return "typeSpecifier"
     case .specializeAttributeArgumentList: return "specializeAttributeSpecList"
     case .specializeAvailabilityArgument: return "availabilityEntry"
     case .specializeTargetFunctionArgument: return "targetFunctionEntry"
@@ -451,9 +460,33 @@ public enum SyntaxNodeKind: String, CaseIterable {
     case .typeAliasDecl: return "typealiasDecl"
     case .unavailableFromAsyncAttributeArguments: return "unavailableFromAsyncArguments"
     case .yieldedExpression: return "yieldExprListElement"
-    case .yieldedExpressionsClause: return "yieldList"
     case .yieldedExpressionList: return "yieldExprList"
+    case .yieldedExpressionsClause: return "yieldList"
     default: return nil
     }
+  }
+
+  public var deprecationMessage: String? {
+    switch self {
+    case ._canImportExpr: return "'canImport' directives are now represented as a `FunctionCallExpr`"
+    case ._canImportVersionInfo: return "'canImport' directives are now represented as a `FunctionCallExpr`"
+    default: return nil
+    }
+  }
+
+  public var isDeprecated: Bool {
+    return rawValue.first == "_"
+  }
+
+  var deprecationAttribute: AttributeSyntax? {
+    if let deprecationMessage = deprecationMessage {
+      AttributeSyntax("@available(*, deprecated, message: \(literal: deprecationMessage)")
+    } else {
+      AttributeSyntax(#"@available(*, deprecated, renamed: "\#(syntaxType)")"#)
+    }
+  }
+
+  public var raw: RawSyntaxNodeKind {
+    RawSyntaxNodeKind(syntaxNodeKind: self)
   }
 }

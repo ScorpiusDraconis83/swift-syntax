@@ -19,7 +19,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
   try! EnumDeclSyntax(
     """
     /// Enum to exhaustively switch over all different syntax nodes.
-    public enum SyntaxEnum
+    public enum SyntaxEnum: Sendable
     """
   ) {
     DeclSyntax("case token(TokenSyntax)")
@@ -27,7 +27,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       DeclSyntax(
         """
         \(node.apiAttributes())\
-        case \(node.varOrCaseName)(\(node.kind.syntaxType))
+        case \(node.enumCaseDeclName)(\(node.kind.syntaxType))
         """
       )
     }
@@ -35,13 +35,13 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
   try! ExtensionDeclSyntax(
     """
-    public extension Syntax
+    extension Syntax
     """
   ) {
     try FunctionDeclSyntax(
       """
       /// Get an enum that can be used to exhaustively switch over all syntax nodes.
-      func `as`(_: SyntaxEnum.Type) -> SyntaxEnum
+      public func `as`(_: SyntaxEnum.Type) -> SyntaxEnum
       """
     ) {
       try SwitchExprSyntax("switch raw.kind") {
@@ -50,8 +50,8 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         }
 
         for node in NON_BASE_SYNTAX_NODES {
-          SwitchCaseSyntax("case .\(node.varOrCaseName):") {
-            StmtSyntax("return .\(node.varOrCaseName)(\(node.kind.syntaxType)(self)!)")
+          SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
+            StmtSyntax("return .\(node.memberCallName)(\(node.kind.syntaxType)(self)!)")
           }
         }
       }
@@ -60,7 +60,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
   for base in SYNTAX_NODES where base.kind.isBase {
     let baseKind = base.kind
-    let baseName = baseKind.rawValue.withFirstCharacterUppercased;
+    let baseName = baseKind.uppercasedFirstWordRawValue
     let enumType: TypeSyntax = "\(raw: baseName)SyntaxEnum"
 
     try! EnumDeclSyntax(
@@ -73,7 +73,7 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
         DeclSyntax(
           """
           \(node.apiAttributes())\
-          case \(node.varOrCaseName)(\(node.kind.syntaxType))
+          case \(node.enumCaseDeclName)(\(node.kind.syntaxType))
           """
         )
       }
@@ -81,19 +81,19 @@ let syntaxEnumFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
 
     try! ExtensionDeclSyntax(
       """
-      public extension \(baseKind.syntaxType)
+      extension \(baseKind.syntaxType)
       """
     ) {
       try FunctionDeclSyntax(
         """
         /// Get an enum that can be used to exhaustively switch over all \(raw: baseName) syntax nodes.
-        func `as`(_: \(enumType).Type) -> \(enumType)
+        public func `as`(_: \(enumType).Type) -> \(enumType)
         """
       ) {
         try SwitchExprSyntax("switch raw.kind") {
           for node in NON_BASE_SYNTAX_NODES where node.base == baseKind {
-            SwitchCaseSyntax("case .\(node.varOrCaseName):") {
-              StmtSyntax("return .\(node.varOrCaseName)(\(node.kind.syntaxType)(self)!)")
+            SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
+              StmtSyntax("return .\(node.memberCallName)(\(node.kind.syntaxType)(self)!)")
             }
           }
           SwitchCaseSyntax("default:") {

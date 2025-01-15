@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 extension FunctionParameterSyntax {
   /// Retrieve the name of the parameter as it is used in source.

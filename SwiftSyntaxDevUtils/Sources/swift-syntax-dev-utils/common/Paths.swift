@@ -14,7 +14,7 @@ import Foundation
 
 enum Paths {
   static var packageDir: URL {
-    URL(fileURLWithPath: #file)
+    URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -75,6 +75,12 @@ enum Paths {
   static var xcodebuildExec: URL {
     get throws {
       return try lookupExecutable(for: "xcodebuild")
+    }
+  }
+
+  static var xcrunExec: URL {
+    get throws {
+      return try lookupExecutable(for: "xcrun")
     }
   }
 

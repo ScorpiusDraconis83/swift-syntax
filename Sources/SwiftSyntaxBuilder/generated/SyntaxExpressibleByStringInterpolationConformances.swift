@@ -12,48 +12,147 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 extension AccessorBlockSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension AccessorBlockSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension AccessorDeclSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension AccessorDeclSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension AttributeSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension AttributeSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension CatchClauseSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension CatchClauseSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension ClosureParameterSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension ClosureParameterSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension CodeBlockItemSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension CodeBlockItemSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension CodeBlockSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension CodeBlockSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension DeclSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension DeclSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension EnumCaseParameterSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension EnumCaseParameterSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension ExprSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension ExprSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension FunctionParameterSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension FunctionParameterSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension GenericParameterClauseSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension GenericParameterClauseSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension MemberBlockSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension MemberBlockSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension PatternSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension PatternSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension SourceFileSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension SourceFileSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension StmtSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension StmtSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension SwitchCaseSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension SwitchCaseSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension TypeSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension TypeSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
+extension VersionTupleSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension VersionTupleSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension AccessorDeclListSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension AccessorDeclListSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension AttributeListSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension AttributeListSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 extension CodeBlockItemListSyntax: SyntaxExpressibleByStringInterpolation {}
 
+#if compiler(>=6)
+extension CodeBlockItemListSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+
 extension MemberBlockItemListSyntax: SyntaxExpressibleByStringInterpolation {}
+
+#if compiler(>=6)
+extension MemberBlockItemListSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
+

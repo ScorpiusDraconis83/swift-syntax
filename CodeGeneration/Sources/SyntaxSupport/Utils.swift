@@ -42,41 +42,25 @@ public func lowercaseFirstWord(name: String) -> String {
 extension SwiftSyntax.Trivia {
   /// Make a new trivia from a (possibly multi-line) string, prepending `///`
   /// to each line and creating a `.docLineComment` trivia piece for each line.
-  public static func docCommentTrivia(from string: String?) -> SwiftSyntax.Trivia {
-    guard let string else {
-      return []
-    }
-
-    let lines = string.split(separator: "\n", omittingEmptySubsequences: false)
-    let pieces = lines.enumerated().map { (index, line) in
-      var line = line
-      if index != lines.count - 1 {
-        line = "\(line)\n"
-      }
-      return SwiftSyntax.TriviaPiece.docLineComment("/// \(line)")
-    }
-    return SwiftSyntax.Trivia(pieces: pieces)
+  public static func docCommentTrivia(from string: String?) -> Self {
+    guard let string else { return [] }
+    let lines = string.split(separator: "\n", omittingEmptySubsequences: false).map { "/// \($0)" }
+    return .init(pieces: lines.flatMap { [.docLineComment($0), .newlines(1)] })
   }
 
   /// Make a new trivia by joining together ``SwiftSyntax/TriviaPiece``s from `joining`,
   /// and gluing them together with pieces from `separator`.
   public init(
     joining items: [SwiftSyntax.Trivia],
-    separator: SwiftSyntax.Trivia = SwiftSyntax.Trivia(pieces: [TriviaPiece.newlines(1), TriviaPiece.docLineComment("///"), TriviaPiece.newlines(1)])
+    separator: SwiftSyntax.Trivia = .init(pieces: [.docLineComment("///"), .newlines(1)])
   ) {
-
-    self.init(
-      pieces:
-        items
-        .filter { !$0.isEmpty }
-        .joined(separator: separator)
-    )
+    self.init(pieces: items.filter { !$0.isEmpty }.joined(separator: separator))
   }
 }
 
-public extension Collection {
+extension Collection {
   /// If the collection contains a single element, return it, otherwise `nil`.
-  var only: Element? {
+  public var only: Element? {
     if !isEmpty && index(after: startIndex) == endIndex {
       return self.first!
     } else {
@@ -85,13 +69,28 @@ public extension Collection {
   }
 }
 
-public extension TokenSyntax {
-  var backtickedIfNeeded: TokenSyntax {
-    if Keyword.allCases.map(\.spec).contains(where: {
-      $0.name == self.description && ($0.isLexerClassified || $0.name == "Type" || $0.name == "Protocol")
-    }) {
+private extension Keyword {
+  static let backticksNeeded: Set<String> = Set(
+    Keyword.allCases.map(\.spec).filter {
+      $0.isLexerClassified || $0.name == "Type" || $0.name == "Protocol"
+    }.map(\.name)
+  )
+}
+
+extension TokenSyntax {
+  public var declNameOrVarCallName: Self {
+    if Keyword.backticksNeeded.contains(self.description) {
       return "`\(self)`"
     } else {
+      return self
+    }
+  }
+
+  public var nonVarCallNameOrLabelDeclName: Self {
+    switch self.tokenKind {
+    case .keyword(.`init`), .identifier("init"):
+      return "`init`"
+    default:
       return self
     }
   }

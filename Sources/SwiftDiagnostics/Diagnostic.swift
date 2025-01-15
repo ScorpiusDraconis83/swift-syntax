@@ -10,9 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
-public struct Diagnostic: CustomDebugStringConvertible {
+public struct Diagnostic: CustomDebugStringConvertible, Sendable {
   /// The message that should be displayed to the user
   public let diagMessage: DiagnosticMessage
 
@@ -74,7 +78,7 @@ public struct Diagnostic: CustomDebugStringConvertible {
   }
 }
 
-public struct DiagnosticsError: Error {
+public struct DiagnosticsError: Error, Sendable {
   public var diagnostics: [Diagnostic]
 
   /// The diagnostics must contain at least one with severity == `.error`.
@@ -86,5 +90,40 @@ public struct DiagnosticsError: Error {
       diagnostics.contains(where: { $0.diagMessage.severity == .error }),
       "at least one diagnostic must have severity == .error"
     )
+  }
+}
+
+/// Diagnostic message used for thrown errors.
+private struct DiagnosticFromError: DiagnosticMessage {
+  let error: Error
+  let severity: DiagnosticSeverity = .error
+
+  var message: String {
+    return String(describing: error)
+  }
+
+  var diagnosticID: MessageID {
+    .init(domain: "SwiftDiagnostics", id: "\(type(of: error))")
+  }
+}
+
+extension Error {
+  /// Given an error, produce an array of diagnostics reporting the error,
+  /// using the given syntax node as the location if it wasn't otherwise known.
+  ///
+  /// This operation will look for diagnostics of known type, such as
+  /// `DiagnosticsError` and `DiagnosticMessage` to retain information. If
+  /// none of those apply, it will produce an `error` diagnostic whose message
+  /// comes from rendering the error as a string.
+  public func asDiagnostics(at node: some SyntaxProtocol) -> [Diagnostic] {
+    if let diagnosticsError = self as? DiagnosticsError {
+      return diagnosticsError.diagnostics
+    }
+
+    if let message = self as? DiagnosticMessage {
+      return [Diagnostic(node: Syntax(node), message: message)]
+    }
+
+    return [Diagnostic(node: Syntax(node), message: DiagnosticFromError(error: self))]
   }
 }

@@ -38,8 +38,8 @@ struct SwiftPMBuilder {
   /// no round-trip or assertion failures.
   let enableTestFuzzing: Bool
 
-  /// Treat all warnings as errors.
-  let warningsAsErrors: Bool
+  /// A flag indicating whether to use local dependencies during the build process.
+  let useLocalDeps: Bool
 
   /// Enable verbose logging.
   let verbose: Bool
@@ -51,7 +51,7 @@ struct SwiftPMBuilder {
     release: Bool = false,
     enableRawSyntaxValidation: Bool = false,
     enableTestFuzzing: Bool = false,
-    warningsAsErrors: Bool = false,
+    useLocalDeps: Bool = true,
     verbose: Bool = false
   ) {
     self.toolchain = toolchain
@@ -60,11 +60,11 @@ struct SwiftPMBuilder {
     self.release = release
     self.enableRawSyntaxValidation = enableRawSyntaxValidation
     self.enableTestFuzzing = enableTestFuzzing
-    self.warningsAsErrors = warningsAsErrors
+    self.useLocalDeps = useLocalDeps
     self.verbose = verbose
   }
 
-  func buildTarget(packageDir: URL, targetName: String) throws {
+  func buildTarget(packageDir: URL, targetName: String, warningsAsErrors: Bool = false) throws {
     logSection("Building target " + targetName)
     try build(packageDir: packageDir, name: targetName, isProduct: false)
   }
@@ -73,6 +73,7 @@ struct SwiftPMBuilder {
   func invokeSwiftPM(
     action: String,
     packageDir: URL,
+    warningsAsErrors: Bool = false,
     additionalArguments: [String],
     additionalEnvironment: [String: String],
     captureStdout: Bool = true,
@@ -88,13 +89,9 @@ struct SwiftPMBuilder {
       args += ["--scratch-path", buildDir]
     }
 
-    if self.warningsAsErrors {
+    if warningsAsErrors {
       args += ["-Xswiftc", "-warnings-as-errors"]
     }
-
-    #if !canImport(Darwin)
-    args += ["--enable-test-discovery"]
-    #endif
 
     if release {
       args += ["--configuration", "release"]
@@ -139,13 +136,15 @@ struct SwiftPMBuilder {
       additionalEnvironment["SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION"] = "1"
     }
 
-    // Tell other projects in the unified build to use local dependencies
-    additionalEnvironment["SWIFTCI_USE_LOCAL_DEPS"] = "1"
+    if useLocalDeps {
+      // Tell other projects in the unified build to use local dependencies
+      additionalEnvironment["SWIFTCI_USE_LOCAL_DEPS"] = "1"
+    }
 
     return additionalEnvironment
   }
 
-  private func build(packageDir: URL, name: String, isProduct: Bool) throws {
+  private func build(packageDir: URL, name: String, isProduct: Bool, warningsAsErrors: Bool = false) throws {
     let args: [String]
 
     if isProduct {
@@ -157,6 +156,7 @@ struct SwiftPMBuilder {
     try invokeSwiftPM(
       action: "build",
       packageDir: packageDir,
+      warningsAsErrors: warningsAsErrors,
       additionalArguments: args,
       additionalEnvironment: swiftPMEnvironmentVariables,
       captureStdout: false,

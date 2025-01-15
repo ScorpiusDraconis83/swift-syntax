@@ -28,7 +28,7 @@ fileprivate extension String {
 private func assertNameMatcherResult(
   _ markedText: String,
   expected: [DeclNameLocationSpec],
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   let (markers, input) = extractMarkers(markedText)
@@ -51,6 +51,7 @@ private func assertNameMatcherResult(
     case .noArguments: argumentLabels = []
     case .call(let labels, _): argumentLabels = labels
     case .parameters(let labels): argumentLabels = labels
+    case .enumCaseParameters(let labels): argumentLabels = labels
     case .noncollapsibleParameters(let labels): argumentLabels = labels
     case .selector(let labels): argumentLabels = labels
     }
@@ -58,7 +59,12 @@ private func assertNameMatcherResult(
     let actualArgumentLabels = argumentLabels.map { input[$0.range] }
     XCTAssertEqual(actualArgumentLabels, expected.arguments, file: file, line: expected.originatorLine)
 
-    XCTAssertEqual(DeclNameLocationSpec.ArgumentsType(actual.arguments), expected.type, file: file, line: expected.originatorLine)
+    XCTAssertEqual(
+      DeclNameLocationSpec.ArgumentsType(actual.arguments),
+      expected.type,
+      file: file,
+      line: expected.originatorLine
+    )
     XCTAssertEqual(actual.isActive, expected.isActive, file: file, line: expected.originatorLine)
     XCTAssertEqual(actual.context, expected.context, file: file, line: expected.originatorLine)
   }
@@ -70,6 +76,7 @@ private struct DeclNameLocationSpec {
     case noArguments
     case call
     case parameters
+    case enumCaseParameters
     case noncollapsibleParameters
     case selector
 
@@ -78,6 +85,7 @@ private struct DeclNameLocationSpec {
       case .noArguments: self = .noArguments
       case .call: self = .call
       case .parameters: self = .parameters
+      case .enumCaseParameters: self = .enumCaseParameters
       case .noncollapsibleParameters: self = .noncollapsibleParameters
       case .selector: self = .selector
       }
@@ -122,7 +130,7 @@ private struct DeclNameLocationSpec {
   }
 }
 
-public class NameMatcherTests: XCTestCase {
+class NameMatcherTests: XCTestCase {
   func testMemberCall() {
     assertNameMatcherResult(
       "Foo.1️⃣first(associated: 1)",
@@ -319,6 +327,65 @@ public class NameMatcherTests: XCTestCase {
       expected: [
         DeclNameLocationSpec(baseName: "fn", argumentLabels: ["x"], type: .selector)
       ]
+    )
+  }
+
+  func testEnumCaseParameterWithLabels() {
+    assertNameMatcherResult(
+      """
+      enum MyEnum {
+        case 1️⃣myCase(label: String)
+      }
+      """,
+      expected: [
+        DeclNameLocationSpec(baseName: "myCase", argumentLabels: ["label"], type: .enumCaseParameters)
+      ]
+    )
+  }
+
+  func testEnumCaseParameterWithoutLabels() {
+    assertNameMatcherResult(
+      """
+      enum MyEnum {
+        case 1️⃣myCase(String)
+      }
+      """,
+      expected: [
+        DeclNameLocationSpec(baseName: "myCase", argumentLabels: [""], type: .enumCaseParameters)
+      ]
+    )
+  }
+
+  func testEnumCaseParameterWithoutAssociatedValues() {
+    assertNameMatcherResult(
+      """
+      enum MyEnum {
+        case 1️⃣myCase
+      }
+      """,
+      expected: [
+        DeclNameLocationSpec(baseName: "myCase", argumentLabels: [], type: .noArguments)
+      ]
+    )
+  }
+
+  func testEnumCaseParameterWithoutWildcardAsExternalLabel() {
+    assertNameMatcherResult(
+      """
+      enum MyEnum {
+        case 1️⃣myCase(_ label: String)
+      }
+      """,
+      expected: [
+        DeclNameLocationSpec(baseName: "myCase", argumentLabels: ["_ label"], type: .enumCaseParameters)
+      ]
+    )
+  }
+
+  func testPositionAtSpaceInFrontOfIdentifier() {
+    assertNameMatcherResult(
+      " 1️⃣ fn",
+      expected: []
     )
   }
 }

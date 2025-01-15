@@ -81,7 +81,7 @@ public struct OptionSetMacro {
     attachedTo decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext,
     emitDiagnostics: Bool
-  ) -> (StructDeclSyntax, EnumDeclSyntax, TypeSyntax)? {
+  ) -> (StructDeclSyntax, EnumDeclSyntax, GenericArgumentSyntax.Argument)? {
     // Determine the name of the options enum.
     let optionsEnumName: String
     if case let .argumentList(arguments) = attribute.arguments,
@@ -93,7 +93,11 @@ public struct OptionSetMacro {
         case let .stringSegment(optionsEnumNameString)? = stringLiteral.segments.first
       else {
         if emitDiagnostics {
-          context.diagnose(OptionSetMacroDiagnostic.requiresStringLiteral(optionsEnumNameArgumentLabel).diagnose(at: optionEnumNameArg.expression))
+          context.diagnose(
+            OptionSetMacroDiagnostic.requiresStringLiteral(optionsEnumNameArgumentLabel).diagnose(
+              at: optionEnumNameArg.expression
+            )
+          )
         }
         return nil
       }
@@ -152,7 +156,9 @@ extension OptionSetMacro: ExtensionMacro {
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
     // Decode the expansion arguments.
-    guard let (structDecl, _, _) = decodeExpansion(of: node, attachedTo: declaration, in: context, emitDiagnostics: false) else {
+    guard
+      let (structDecl, _, _) = decodeExpansion(of: node, attachedTo: declaration, in: context, emitDiagnostics: false)
+    else {
       return []
     }
 
@@ -171,15 +177,23 @@ extension OptionSetMacro: MemberMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
     providingMembersOf decl: some DeclGroupSyntax,
+    conformingTo: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     // Decode the expansion arguments.
-    guard let (_, optionsEnum, rawType) = decodeExpansion(of: attribute, attachedTo: decl, in: context, emitDiagnostics: true) else {
+    guard
+      let (_, optionsEnum, rawType) = decodeExpansion(
+        of: attribute,
+        attachedTo: decl,
+        in: context,
+        emitDiagnostics: true
+      )
+    else {
       return []
     }
 
     // Find all of the case elements.
-    let caseElements = optionsEnum.memberBlock.members.flatMap { member in
+    let caseElements: [EnumCaseElementSyntax] = optionsEnum.memberBlock.members.flatMap { member in
       guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else {
         return Array<EnumCaseElementSyntax>()
       }

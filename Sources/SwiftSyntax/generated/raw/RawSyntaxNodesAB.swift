@@ -12,16 +12,140 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=5.8)
+@_spi(ExperimentalLanguageFeatures)
+#endif
+@_spi(RawSyntax)
+public struct RawABIAttributeArgumentsSyntax: RawSyntaxNodeProtocol {
+  public enum Provider: RawSyntaxNodeProtocol {
+    case associatedType(RawAssociatedTypeDeclSyntax)
+    case deinitializer(RawDeinitializerDeclSyntax)
+    case enumCase(RawEnumCaseDeclSyntax)
+    case function(RawFunctionDeclSyntax)
+    case initializer(RawInitializerDeclSyntax)
+    case missing(RawMissingDeclSyntax)
+    case `subscript`(RawSubscriptDeclSyntax)
+    case typeAlias(RawTypeAliasDeclSyntax)
+    case variable(RawVariableDeclSyntax)
+
+    public static func isKindOf(_ raw: RawSyntax) -> Bool {
+      RawAssociatedTypeDeclSyntax.isKindOf(raw) || RawDeinitializerDeclSyntax.isKindOf(raw) || RawEnumCaseDeclSyntax.isKindOf(raw) || RawFunctionDeclSyntax.isKindOf(raw) || RawInitializerDeclSyntax.isKindOf(raw) || RawMissingDeclSyntax.isKindOf(raw) || RawSubscriptDeclSyntax.isKindOf(raw) || RawTypeAliasDeclSyntax.isKindOf(raw) || RawVariableDeclSyntax.isKindOf(raw)
+    }
+
+    public var raw: RawSyntax {
+      switch self {
+      case .associatedType(let node):
+        return node.raw
+      case .deinitializer(let node):
+        return node.raw
+      case .enumCase(let node):
+        return node.raw
+      case .function(let node):
+        return node.raw
+      case .initializer(let node):
+        return node.raw
+      case .missing(let node):
+        return node.raw
+      case .subscript(let node):
+        return node.raw
+      case .typeAlias(let node):
+        return node.raw
+      case .variable(let node):
+        return node.raw
+      }
+    }
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawAssociatedTypeDeclSyntax.self) {
+        self = .associatedType(node)
+      } else if let node = node.as(RawDeinitializerDeclSyntax.self) {
+        self = .deinitializer(node)
+      } else if let node = node.as(RawEnumCaseDeclSyntax.self) {
+        self = .enumCase(node)
+      } else if let node = node.as(RawFunctionDeclSyntax.self) {
+        self = .function(node)
+      } else if let node = node.as(RawInitializerDeclSyntax.self) {
+        self = .initializer(node)
+      } else if let node = node.as(RawMissingDeclSyntax.self) {
+        self = .missing(node)
+      } else if let node = node.as(RawSubscriptDeclSyntax.self) {
+        self = .subscript(node)
+      } else if let node = node.as(RawTypeAliasDeclSyntax.self) {
+        self = .typeAlias(node)
+      } else if let node = node.as(RawVariableDeclSyntax.self) {
+        self = .variable(node)
+      } else {
+        return nil
+      }
+    }
+  }
+
+  @_spi(RawSyntax)
+  public var layoutView: RawSyntaxLayoutView {
+    return raw.layoutView!
+  }
+
+  public static func isKindOf(_ raw: RawSyntax) -> Bool {
+    return raw.kind == .abiAttributeArguments
+  }
+
+  public var raw: RawSyntax
+
+  init(raw: RawSyntax) {
+    precondition(Self.isKindOf(raw))
+    self.raw = raw
+  }
+
+  private init(unchecked raw: RawSyntax) {
+    self.raw = raw
+  }
+
+  public init?(_ other: some RawSyntaxNodeProtocol) {
+    guard Self.isKindOf(other.raw) else {
+      return nil
+    }
+    self.init(unchecked: other.raw)
+  }
+
+  public init(
+    _ unexpectedBeforeProvider: RawUnexpectedNodesSyntax? = nil,
+    provider: Provider,
+    _ unexpectedAfterProvider: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
+    let raw = RawSyntax.makeLayout(
+      kind: .abiAttributeArguments, uninitializedCount: 3, arena: arena) { layout in
+      layout.initialize(repeating: nil)
+      layout[0] = unexpectedBeforeProvider?.raw
+      layout[1] = provider.raw
+      layout[2] = unexpectedAfterProvider?.raw
+    }
+    self.init(unchecked: raw)
+  }
+
+  public var unexpectedBeforeProvider: RawUnexpectedNodesSyntax? {
+    layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+
+  public var provider: RawSyntax {
+    layoutView.children[1]!
+  }
+
+  public var unexpectedAfterProvider: RawUnexpectedNodesSyntax? {
+    layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
+  }
+}
+
 @_spi(RawSyntax)
 public struct RawAccessorBlockSyntax: RawSyntaxNodeProtocol {
   public enum Accessors: RawSyntaxNodeProtocol {
-    case `accessors`(RawAccessorDeclListSyntax)
-    case `getter`(RawCodeBlockItemListSyntax)
-    
+    case accessors(RawAccessorDeclListSyntax)
+    case getter(RawCodeBlockItemListSyntax)
+
     public static func isKindOf(_ raw: RawSyntax) -> Bool {
-      return RawAccessorDeclListSyntax.isKindOf(raw) || RawCodeBlockItemListSyntax.isKindOf(raw)
+      RawAccessorDeclListSyntax.isKindOf(raw) || RawCodeBlockItemListSyntax.isKindOf(raw)
     }
-    
+
     public var raw: RawSyntax {
       switch self {
       case .accessors(let node):
@@ -30,57 +154,55 @@ public struct RawAccessorBlockSyntax: RawSyntaxNodeProtocol {
         return node.raw
       }
     }
-    
-    public init?(_ other: some RawSyntaxNodeProtocol) {
-      if let node = RawAccessorDeclListSyntax(other) {
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawAccessorDeclListSyntax.self) {
         self = .accessors(node)
-        return
-      }
-      if let node = RawCodeBlockItemListSyntax(other) {
+      } else if let node = node.as(RawCodeBlockItemListSyntax.self) {
         self = .getter(node)
-        return
+      } else {
+        return nil
       }
-      return nil
     }
   }
-  
+
   @_spi(RawSyntax)
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .accessorBlock
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLeftBrace: RawUnexpectedNodesSyntax? = nil, 
-      leftBrace: RawTokenSyntax, 
-      _ unexpectedBetweenLeftBraceAndAccessors: RawUnexpectedNodesSyntax? = nil, 
-      accessors: Accessors, 
-      _ unexpectedBetweenAccessorsAndRightBrace: RawUnexpectedNodesSyntax? = nil, 
-      rightBrace: RawTokenSyntax, 
-      _ unexpectedAfterRightBrace: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLeftBrace: RawUnexpectedNodesSyntax? = nil,
+    leftBrace: RawTokenSyntax,
+    _ unexpectedBetweenLeftBraceAndAccessors: RawUnexpectedNodesSyntax? = nil,
+    accessors: Accessors,
+    _ unexpectedBetweenAccessorsAndRightBrace: RawUnexpectedNodesSyntax? = nil,
+    rightBrace: RawTokenSyntax,
+    _ unexpectedAfterRightBrace: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .accessorBlock, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -94,31 +216,31 @@ public struct RawAccessorBlockSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLeftBrace: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftBrace: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLeftBraceAndAccessors: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var accessors: RawSyntax {
     layoutView.children[3]!
   }
-  
+
   public var unexpectedBetweenAccessorsAndRightBrace: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightBrace: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterRightBrace: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -130,29 +252,29 @@ public struct RawAccessorDeclListSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .accessorDeclList
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(elements: [RawAccessorDeclSyntax], arena: __shared SyntaxArena) {
     let raw = RawSyntax.makeLayout(
       kind: .accessorDeclList, uninitializedCount: elements.count, arena: arena) { layout in
@@ -166,7 +288,7 @@ public struct RawAccessorDeclListSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var elements: [RawAccessorDeclSyntax] {
     layoutView.children.map {
       RawAccessorDeclSyntax(raw: $0!)
@@ -180,45 +302,45 @@ public struct RawAccessorDeclSyntax: RawDeclSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .accessorDecl
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil, 
-      attributes: RawAttributeListSyntax, 
-      _ unexpectedBetweenAttributesAndModifier: RawUnexpectedNodesSyntax? = nil, 
-      modifier: RawDeclModifierSyntax?, 
-      _ unexpectedBetweenModifierAndAccessorSpecifier: RawUnexpectedNodesSyntax? = nil, 
-      accessorSpecifier: RawTokenSyntax, 
-      _ unexpectedBetweenAccessorSpecifierAndParameters: RawUnexpectedNodesSyntax? = nil, 
-      parameters: RawAccessorParametersSyntax?, 
-      _ unexpectedBetweenParametersAndEffectSpecifiers: RawUnexpectedNodesSyntax? = nil, 
-      effectSpecifiers: RawAccessorEffectSpecifiersSyntax?, 
-      _ unexpectedBetweenEffectSpecifiersAndBody: RawUnexpectedNodesSyntax? = nil, 
-      body: RawCodeBlockSyntax?, 
-      _ unexpectedAfterBody: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil,
+    attributes: RawAttributeListSyntax,
+    _ unexpectedBetweenAttributesAndModifier: RawUnexpectedNodesSyntax? = nil,
+    modifier: RawDeclModifierSyntax?,
+    _ unexpectedBetweenModifierAndAccessorSpecifier: RawUnexpectedNodesSyntax? = nil,
+    accessorSpecifier: RawTokenSyntax,
+    _ unexpectedBetweenAccessorSpecifierAndParameters: RawUnexpectedNodesSyntax? = nil,
+    parameters: RawAccessorParametersSyntax?,
+    _ unexpectedBetweenParametersAndEffectSpecifiers: RawUnexpectedNodesSyntax? = nil,
+    effectSpecifiers: RawAccessorEffectSpecifiersSyntax?,
+    _ unexpectedBetweenEffectSpecifiersAndBody: RawUnexpectedNodesSyntax? = nil,
+    body: RawCodeBlockSyntax?,
+    _ unexpectedAfterBody: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .accessorDecl, uninitializedCount: 13, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -238,55 +360,55 @@ public struct RawAccessorDeclSyntax: RawDeclSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var attributes: RawAttributeListSyntax {
     layoutView.children[1].map(RawAttributeListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAttributesAndModifier: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var modifier: RawDeclModifierSyntax? {
     layoutView.children[3].map(RawDeclModifierSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenModifierAndAccessorSpecifier: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var accessorSpecifier: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAccessorSpecifierAndParameters: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var parameters: RawAccessorParametersSyntax? {
     layoutView.children[7].map(RawAccessorParametersSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenParametersAndEffectSpecifiers: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var effectSpecifiers: RawAccessorEffectSpecifiersSyntax? {
     layoutView.children[9].map(RawAccessorEffectSpecifiersSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenEffectSpecifiersAndBody: RawUnexpectedNodesSyntax? {
     layoutView.children[10].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var body: RawCodeBlockSyntax? {
     layoutView.children[11].map(RawCodeBlockSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterBody: RawUnexpectedNodesSyntax? {
     layoutView.children[12].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -298,37 +420,37 @@ public struct RawAccessorEffectSpecifiersSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .accessorEffectSpecifiers
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAsyncSpecifier: RawUnexpectedNodesSyntax? = nil, 
-      asyncSpecifier: RawTokenSyntax?, 
-      _ unexpectedBetweenAsyncSpecifierAndThrowsClause: RawUnexpectedNodesSyntax? = nil, 
-      throwsClause: RawThrowsClauseSyntax?, 
-      _ unexpectedAfterThrowsClause: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAsyncSpecifier: RawUnexpectedNodesSyntax? = nil,
+    asyncSpecifier: RawTokenSyntax?,
+    _ unexpectedBetweenAsyncSpecifierAndThrowsClause: RawUnexpectedNodesSyntax? = nil,
+    throwsClause: RawThrowsClauseSyntax?,
+    _ unexpectedAfterThrowsClause: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .accessorEffectSpecifiers, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -340,23 +462,23 @@ public struct RawAccessorEffectSpecifiersSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAsyncSpecifier: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var asyncSpecifier: RawTokenSyntax? {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenAsyncSpecifierAndThrowsClause: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var throwsClause: RawThrowsClauseSyntax? {
     layoutView.children[3].map(RawThrowsClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterThrowsClause: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -368,39 +490,39 @@ public struct RawAccessorParametersSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .accessorParameters
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLeftParen: RawUnexpectedNodesSyntax? = nil, 
-      leftParen: RawTokenSyntax, 
-      _ unexpectedBetweenLeftParenAndName: RawUnexpectedNodesSyntax? = nil, 
-      name: RawTokenSyntax, 
-      _ unexpectedBetweenNameAndRightParen: RawUnexpectedNodesSyntax? = nil, 
-      rightParen: RawTokenSyntax, 
-      _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLeftParen: RawUnexpectedNodesSyntax? = nil,
+    leftParen: RawTokenSyntax,
+    _ unexpectedBetweenLeftParenAndName: RawUnexpectedNodesSyntax? = nil,
+    name: RawTokenSyntax,
+    _ unexpectedBetweenNameAndRightParen: RawUnexpectedNodesSyntax? = nil,
+    rightParen: RawTokenSyntax,
+    _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .accessorParameters, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -414,31 +536,31 @@ public struct RawAccessorParametersSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLeftParen: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftParen: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLeftParenAndName: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var name: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenNameAndRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightParen: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -450,49 +572,49 @@ public struct RawActorDeclSyntax: RawDeclSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .actorDecl
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil, 
-      attributes: RawAttributeListSyntax, 
-      _ unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? = nil, 
-      modifiers: RawDeclModifierListSyntax, 
-      _ unexpectedBetweenModifiersAndActorKeyword: RawUnexpectedNodesSyntax? = nil, 
-      actorKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenActorKeywordAndName: RawUnexpectedNodesSyntax? = nil, 
-      name: RawTokenSyntax, 
-      _ unexpectedBetweenNameAndGenericParameterClause: RawUnexpectedNodesSyntax? = nil, 
-      genericParameterClause: RawGenericParameterClauseSyntax?, 
-      _ unexpectedBetweenGenericParameterClauseAndInheritanceClause: RawUnexpectedNodesSyntax? = nil, 
-      inheritanceClause: RawInheritanceClauseSyntax?, 
-      _ unexpectedBetweenInheritanceClauseAndGenericWhereClause: RawUnexpectedNodesSyntax? = nil, 
-      genericWhereClause: RawGenericWhereClauseSyntax?, 
-      _ unexpectedBetweenGenericWhereClauseAndMemberBlock: RawUnexpectedNodesSyntax? = nil, 
-      memberBlock: RawMemberBlockSyntax, 
-      _ unexpectedAfterMemberBlock: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil,
+    attributes: RawAttributeListSyntax,
+    _ unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? = nil,
+    modifiers: RawDeclModifierListSyntax,
+    _ unexpectedBetweenModifiersAndActorKeyword: RawUnexpectedNodesSyntax? = nil,
+    actorKeyword: RawTokenSyntax,
+    _ unexpectedBetweenActorKeywordAndName: RawUnexpectedNodesSyntax? = nil,
+    name: RawTokenSyntax,
+    _ unexpectedBetweenNameAndGenericParameterClause: RawUnexpectedNodesSyntax? = nil,
+    genericParameterClause: RawGenericParameterClauseSyntax?,
+    _ unexpectedBetweenGenericParameterClauseAndInheritanceClause: RawUnexpectedNodesSyntax? = nil,
+    inheritanceClause: RawInheritanceClauseSyntax?,
+    _ unexpectedBetweenInheritanceClauseAndGenericWhereClause: RawUnexpectedNodesSyntax? = nil,
+    genericWhereClause: RawGenericWhereClauseSyntax?,
+    _ unexpectedBetweenGenericWhereClauseAndMemberBlock: RawUnexpectedNodesSyntax? = nil,
+    memberBlock: RawMemberBlockSyntax,
+    _ unexpectedAfterMemberBlock: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .actorDecl, uninitializedCount: 17, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -516,71 +638,71 @@ public struct RawActorDeclSyntax: RawDeclSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var attributes: RawAttributeListSyntax {
     layoutView.children[1].map(RawAttributeListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var modifiers: RawDeclModifierListSyntax {
     layoutView.children[3].map(RawDeclModifierListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenModifiersAndActorKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var actorKeyword: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenActorKeywordAndName: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var name: RawTokenSyntax {
     layoutView.children[7].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenNameAndGenericParameterClause: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var genericParameterClause: RawGenericParameterClauseSyntax? {
     layoutView.children[9].map(RawGenericParameterClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenGenericParameterClauseAndInheritanceClause: RawUnexpectedNodesSyntax? {
     layoutView.children[10].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var inheritanceClause: RawInheritanceClauseSyntax? {
     layoutView.children[11].map(RawInheritanceClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenInheritanceClauseAndGenericWhereClause: RawUnexpectedNodesSyntax? {
     layoutView.children[12].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var genericWhereClause: RawGenericWhereClauseSyntax? {
     layoutView.children[13].map(RawGenericWhereClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenGenericWhereClauseAndMemberBlock: RawUnexpectedNodesSyntax? {
     layoutView.children[14].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var memberBlock: RawMemberBlockSyntax {
     layoutView.children[15].map(RawMemberBlockSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterMemberBlock: RawUnexpectedNodesSyntax? {
     layoutView.children[16].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -592,29 +714,29 @@ public struct RawArrayElementListSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .arrayElementList
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(elements: [RawArrayElementSyntax], arena: __shared SyntaxArena) {
     let raw = RawSyntax.makeLayout(
       kind: .arrayElementList, uninitializedCount: elements.count, arena: arena) { layout in
@@ -628,7 +750,7 @@ public struct RawArrayElementListSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var elements: [RawArrayElementSyntax] {
     layoutView.children.map {
       RawArrayElementSyntax(raw: $0!)
@@ -642,37 +764,37 @@ public struct RawArrayElementSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .arrayElement
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeExpression: RawUnexpectedNodesSyntax? = nil, 
-      expression: RawExprSyntax, 
-      _ unexpectedBetweenExpressionAndTrailingComma: RawUnexpectedNodesSyntax? = nil, 
-      trailingComma: RawTokenSyntax?, 
-      _ unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeExpression: RawUnexpectedNodesSyntax? = nil,
+    expression: some RawExprSyntaxNodeProtocol,
+    _ unexpectedBetweenExpressionAndTrailingComma: RawUnexpectedNodesSyntax? = nil,
+    trailingComma: RawTokenSyntax?,
+    _ unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .arrayElement, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -684,23 +806,23 @@ public struct RawArrayElementSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var expression: RawExprSyntax {
     layoutView.children[1].map(RawExprSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenExpressionAndTrailingComma: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var trailingComma: RawTokenSyntax? {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -712,39 +834,39 @@ public struct RawArrayExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .arrayExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? = nil, 
-      leftSquare: RawTokenSyntax, 
-      _ unexpectedBetweenLeftSquareAndElements: RawUnexpectedNodesSyntax? = nil, 
-      elements: RawArrayElementListSyntax, 
-      _ unexpectedBetweenElementsAndRightSquare: RawUnexpectedNodesSyntax? = nil, 
-      rightSquare: RawTokenSyntax, 
-      _ unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? = nil,
+    leftSquare: RawTokenSyntax,
+    _ unexpectedBetweenLeftSquareAndElements: RawUnexpectedNodesSyntax? = nil,
+    elements: RawArrayElementListSyntax,
+    _ unexpectedBetweenElementsAndRightSquare: RawUnexpectedNodesSyntax? = nil,
+    rightSquare: RawTokenSyntax,
+    _ unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .arrayExpr, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -758,31 +880,31 @@ public struct RawArrayExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftSquare: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLeftSquareAndElements: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var elements: RawArrayElementListSyntax {
     layoutView.children[3].map(RawArrayElementListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenElementsAndRightSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightSquare: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -794,39 +916,39 @@ public struct RawArrayTypeSyntax: RawTypeSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .arrayType
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? = nil, 
-      leftSquare: RawTokenSyntax, 
-      _ unexpectedBetweenLeftSquareAndElement: RawUnexpectedNodesSyntax? = nil, 
-      element: RawTypeSyntax, 
-      _ unexpectedBetweenElementAndRightSquare: RawUnexpectedNodesSyntax? = nil, 
-      rightSquare: RawTokenSyntax, 
-      _ unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? = nil,
+    leftSquare: RawTokenSyntax,
+    _ unexpectedBetweenLeftSquareAndElement: RawUnexpectedNodesSyntax? = nil,
+    element: some RawTypeSyntaxNodeProtocol,
+    _ unexpectedBetweenElementAndRightSquare: RawUnexpectedNodesSyntax? = nil,
+    rightSquare: RawTokenSyntax,
+    _ unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .arrayType, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -840,31 +962,31 @@ public struct RawArrayTypeSyntax: RawTypeSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLeftSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftSquare: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLeftSquareAndElement: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var element: RawTypeSyntax {
     layoutView.children[3].map(RawTypeSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenElementAndRightSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightSquare: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterRightSquare: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -876,37 +998,37 @@ public struct RawArrowExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .arrowExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeEffectSpecifiers: RawUnexpectedNodesSyntax? = nil, 
-      effectSpecifiers: RawTypeEffectSpecifiersSyntax?, 
-      _ unexpectedBetweenEffectSpecifiersAndArrow: RawUnexpectedNodesSyntax? = nil, 
-      arrow: RawTokenSyntax, 
-      _ unexpectedAfterArrow: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeEffectSpecifiers: RawUnexpectedNodesSyntax? = nil,
+    effectSpecifiers: RawTypeEffectSpecifiersSyntax?,
+    _ unexpectedBetweenEffectSpecifiersAndArrow: RawUnexpectedNodesSyntax? = nil,
+    arrow: RawTokenSyntax,
+    _ unexpectedAfterArrow: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .arrowExpr, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -918,23 +1040,23 @@ public struct RawArrowExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeEffectSpecifiers: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var effectSpecifiers: RawTypeEffectSpecifiersSyntax? {
     layoutView.children[1].map(RawTypeEffectSpecifiersSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenEffectSpecifiersAndArrow: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var arrow: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterArrow: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -946,41 +1068,41 @@ public struct RawAsExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .asExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeExpression: RawUnexpectedNodesSyntax? = nil, 
-      expression: RawExprSyntax, 
-      _ unexpectedBetweenExpressionAndAsKeyword: RawUnexpectedNodesSyntax? = nil, 
-      asKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenAsKeywordAndQuestionOrExclamationMark: RawUnexpectedNodesSyntax? = nil, 
-      questionOrExclamationMark: RawTokenSyntax?, 
-      _ unexpectedBetweenQuestionOrExclamationMarkAndType: RawUnexpectedNodesSyntax? = nil, 
-      type: RawTypeSyntax, 
-      _ unexpectedAfterType: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeExpression: RawUnexpectedNodesSyntax? = nil,
+    expression: some RawExprSyntaxNodeProtocol,
+    _ unexpectedBetweenExpressionAndAsKeyword: RawUnexpectedNodesSyntax? = nil,
+    asKeyword: RawTokenSyntax,
+    _ unexpectedBetweenAsKeywordAndQuestionOrExclamationMark: RawUnexpectedNodesSyntax? = nil,
+    questionOrExclamationMark: RawTokenSyntax?,
+    _ unexpectedBetweenQuestionOrExclamationMarkAndType: RawUnexpectedNodesSyntax? = nil,
+    type: some RawTypeSyntaxNodeProtocol,
+    _ unexpectedAfterType: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .asExpr, uninitializedCount: 9, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -996,39 +1118,39 @@ public struct RawAsExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var expression: RawExprSyntax {
     layoutView.children[1].map(RawExprSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenExpressionAndAsKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var asKeyword: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAsKeywordAndQuestionOrExclamationMark: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var questionOrExclamationMark: RawTokenSyntax? {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenQuestionOrExclamationMarkAndType: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var type: RawTypeSyntax {
     layoutView.children[7].map(RawTypeSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterType: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1040,35 +1162,35 @@ public struct RawAssignmentExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .assignmentExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeEqual: RawUnexpectedNodesSyntax? = nil, 
-      equal: RawTokenSyntax, 
-      _ unexpectedAfterEqual: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeEqual: RawUnexpectedNodesSyntax? = nil,
+    equal: RawTokenSyntax,
+    _ unexpectedAfterEqual: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .assignmentExpr, uninitializedCount: 3, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1078,15 +1200,15 @@ public struct RawAssignmentExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeEqual: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var equal: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterEqual: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1098,47 +1220,47 @@ public struct RawAssociatedTypeDeclSyntax: RawDeclSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .associatedTypeDecl
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil, 
-      attributes: RawAttributeListSyntax, 
-      _ unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? = nil, 
-      modifiers: RawDeclModifierListSyntax, 
-      _ unexpectedBetweenModifiersAndAssociatedtypeKeyword: RawUnexpectedNodesSyntax? = nil, 
-      associatedtypeKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenAssociatedtypeKeywordAndName: RawUnexpectedNodesSyntax? = nil, 
-      name: RawTokenSyntax, 
-      _ unexpectedBetweenNameAndInheritanceClause: RawUnexpectedNodesSyntax? = nil, 
-      inheritanceClause: RawInheritanceClauseSyntax?, 
-      _ unexpectedBetweenInheritanceClauseAndInitializer: RawUnexpectedNodesSyntax? = nil, 
-      initializer: RawTypeInitializerClauseSyntax?, 
-      _ unexpectedBetweenInitializerAndGenericWhereClause: RawUnexpectedNodesSyntax? = nil, 
-      genericWhereClause: RawGenericWhereClauseSyntax?, 
-      _ unexpectedAfterGenericWhereClause: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? = nil,
+    attributes: RawAttributeListSyntax,
+    _ unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? = nil,
+    modifiers: RawDeclModifierListSyntax,
+    _ unexpectedBetweenModifiersAndAssociatedtypeKeyword: RawUnexpectedNodesSyntax? = nil,
+    associatedtypeKeyword: RawTokenSyntax,
+    _ unexpectedBetweenAssociatedtypeKeywordAndName: RawUnexpectedNodesSyntax? = nil,
+    name: RawTokenSyntax,
+    _ unexpectedBetweenNameAndInheritanceClause: RawUnexpectedNodesSyntax? = nil,
+    inheritanceClause: RawInheritanceClauseSyntax?,
+    _ unexpectedBetweenInheritanceClauseAndInitializer: RawUnexpectedNodesSyntax? = nil,
+    initializer: RawTypeInitializerClauseSyntax?,
+    _ unexpectedBetweenInitializerAndGenericWhereClause: RawUnexpectedNodesSyntax? = nil,
+    genericWhereClause: RawGenericWhereClauseSyntax?,
+    _ unexpectedAfterGenericWhereClause: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .associatedTypeDecl, uninitializedCount: 15, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1160,63 +1282,63 @@ public struct RawAssociatedTypeDeclSyntax: RawDeclSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAttributes: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var attributes: RawAttributeListSyntax {
     layoutView.children[1].map(RawAttributeListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAttributesAndModifiers: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var modifiers: RawDeclModifierListSyntax {
     layoutView.children[3].map(RawDeclModifierListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenModifiersAndAssociatedtypeKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var associatedtypeKeyword: RawTokenSyntax {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAssociatedtypeKeywordAndName: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var name: RawTokenSyntax {
     layoutView.children[7].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenNameAndInheritanceClause: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var inheritanceClause: RawInheritanceClauseSyntax? {
     layoutView.children[9].map(RawInheritanceClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenInheritanceClauseAndInitializer: RawUnexpectedNodesSyntax? {
     layoutView.children[10].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var initializer: RawTypeInitializerClauseSyntax? {
     layoutView.children[11].map(RawTypeInitializerClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenInitializerAndGenericWhereClause: RawUnexpectedNodesSyntax? {
     layoutView.children[12].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var genericWhereClause: RawGenericWhereClauseSyntax? {
     layoutView.children[13].map(RawGenericWhereClauseSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterGenericWhereClause: RawUnexpectedNodesSyntax? {
     layoutView.children[14].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1225,13 +1347,14 @@ public struct RawAssociatedTypeDeclSyntax: RawDeclSyntaxNodeProtocol {
 @_spi(RawSyntax)
 public struct RawAttributeListSyntax: RawSyntaxNodeProtocol {
   public enum Element: RawSyntaxNodeProtocol {
-    case `attribute`(RawAttributeSyntax)
-    case `ifConfigDecl`(RawIfConfigDeclSyntax)
-    
+    /// An `@` attribute.
+    case attribute(RawAttributeSyntax)
+    case ifConfigDecl(RawIfConfigDeclSyntax)
+
     public static func isKindOf(_ raw: RawSyntax) -> Bool {
-      return RawAttributeSyntax.isKindOf(raw) || RawIfConfigDeclSyntax.isKindOf(raw)
+      RawAttributeSyntax.isKindOf(raw) || RawIfConfigDeclSyntax.isKindOf(raw)
     }
-    
+
     public var raw: RawSyntax {
       switch self {
       case .attribute(let node):
@@ -1240,47 +1363,45 @@ public struct RawAttributeListSyntax: RawSyntaxNodeProtocol {
         return node.raw
       }
     }
-    
-    public init?(_ other: some RawSyntaxNodeProtocol) {
-      if let node = RawAttributeSyntax(other) {
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawAttributeSyntax.self) {
         self = .attribute(node)
-        return
-      }
-      if let node = RawIfConfigDeclSyntax(other) {
+      } else if let node = node.as(RawIfConfigDeclSyntax.self) {
         self = .ifConfigDecl(node)
-        return
+      } else {
+        return nil
       }
-      return nil
     }
   }
-  
+
   @_spi(RawSyntax)
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .attributeList
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(elements: [Element], arena: __shared SyntaxArena) {
     let raw = RawSyntax.makeLayout(
       kind: .attributeList, uninitializedCount: elements.count, arena: arena) { layout in
@@ -1294,7 +1415,7 @@ public struct RawAttributeListSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var elements: [RawSyntax] {
     layoutView.children.map {
       RawSyntax(raw: $0!)
@@ -1305,31 +1426,34 @@ public struct RawAttributeListSyntax: RawSyntaxNodeProtocol {
 @_spi(RawSyntax)
 public struct RawAttributeSyntax: RawSyntaxNodeProtocol {
   public enum Arguments: RawSyntaxNodeProtocol {
-    case `argumentList`(RawLabeledExprListSyntax)
-    case `token`(RawTokenSyntax)
-    case `string`(RawStringLiteralExprSyntax)
-    case `availability`(RawAvailabilityArgumentListSyntax)
-    case `specializeArguments`(RawSpecializeAttributeArgumentListSyntax)
-    case `objCName`(RawObjCSelectorPieceListSyntax)
-    case `implementsArguments`(RawImplementsAttributeArgumentsSyntax)
-    case `differentiableArguments`(RawDifferentiableAttributeArgumentsSyntax)
-    case `derivativeRegistrationArguments`(RawDerivativeAttributeArgumentsSyntax)
-    case `backDeployedArguments`(RawBackDeployedAttributeArgumentsSyntax)
-    case `conventionArguments`(RawConventionAttributeArgumentsSyntax)
-    case `conventionWitnessMethodArguments`(RawConventionWitnessMethodAttributeArgumentsSyntax)
-    case `opaqueReturnTypeOfAttributeArguments`(RawOpaqueReturnTypeOfAttributeArgumentsSyntax)
-    case `exposeAttributeArguments`(RawExposeAttributeArgumentsSyntax)
-    case `originallyDefinedInArguments`(RawOriginallyDefinedInAttributeArgumentsSyntax)
-    case `underscorePrivateAttributeArguments`(RawUnderscorePrivateAttributeArgumentsSyntax)
-    case `dynamicReplacementArguments`(RawDynamicReplacementAttributeArgumentsSyntax)
-    case `unavailableFromAsyncArguments`(RawUnavailableFromAsyncAttributeArgumentsSyntax)
-    case `effectsArguments`(RawEffectsAttributeArgumentListSyntax)
-    case `documentationArguments`(RawDocumentationAttributeArgumentListSyntax)
-    
+    case argumentList(RawLabeledExprListSyntax)
+    case token(RawTokenSyntax)
+    case string(RawStringLiteralExprSyntax)
+    case availability(RawAvailabilityArgumentListSyntax)
+    case specializeArguments(RawSpecializeAttributeArgumentListSyntax)
+    case objCName(RawObjCSelectorPieceListSyntax)
+    case implementsArguments(RawImplementsAttributeArgumentsSyntax)
+    case differentiableArguments(RawDifferentiableAttributeArgumentsSyntax)
+    case derivativeRegistrationArguments(RawDerivativeAttributeArgumentsSyntax)
+    case backDeployedArguments(RawBackDeployedAttributeArgumentsSyntax)
+    case conventionArguments(RawConventionAttributeArgumentsSyntax)
+    case conventionWitnessMethodArguments(RawConventionWitnessMethodAttributeArgumentsSyntax)
+    case opaqueReturnTypeOfAttributeArguments(RawOpaqueReturnTypeOfAttributeArgumentsSyntax)
+    case exposeAttributeArguments(RawExposeAttributeArgumentsSyntax)
+    case originallyDefinedInArguments(RawOriginallyDefinedInAttributeArgumentsSyntax)
+    case underscorePrivateAttributeArguments(RawUnderscorePrivateAttributeArgumentsSyntax)
+    case dynamicReplacementArguments(RawDynamicReplacementAttributeArgumentsSyntax)
+    case unavailableFromAsyncArguments(RawUnavailableFromAsyncAttributeArgumentsSyntax)
+    case effectsArguments(RawEffectsAttributeArgumentListSyntax)
+    case documentationArguments(RawDocumentationAttributeArgumentListSyntax)
+    /// - Note: Requires experimental feature `abiAttribute`.
+    @_spi(ExperimentalLanguageFeatures)
+    case abiArguments(RawABIAttributeArgumentsSyntax)
+
     public static func isKindOf(_ raw: RawSyntax) -> Bool {
-      return RawLabeledExprListSyntax.isKindOf(raw) || RawTokenSyntax.isKindOf(raw) || RawStringLiteralExprSyntax.isKindOf(raw) || RawAvailabilityArgumentListSyntax.isKindOf(raw) || RawSpecializeAttributeArgumentListSyntax.isKindOf(raw) || RawObjCSelectorPieceListSyntax.isKindOf(raw) || RawImplementsAttributeArgumentsSyntax.isKindOf(raw) || RawDifferentiableAttributeArgumentsSyntax.isKindOf(raw) || RawDerivativeAttributeArgumentsSyntax.isKindOf(raw) || RawBackDeployedAttributeArgumentsSyntax.isKindOf(raw) || RawConventionAttributeArgumentsSyntax.isKindOf(raw) || RawConventionWitnessMethodAttributeArgumentsSyntax.isKindOf(raw) || RawOpaqueReturnTypeOfAttributeArgumentsSyntax.isKindOf(raw) || RawExposeAttributeArgumentsSyntax.isKindOf(raw) || RawOriginallyDefinedInAttributeArgumentsSyntax.isKindOf(raw) || RawUnderscorePrivateAttributeArgumentsSyntax.isKindOf(raw) || RawDynamicReplacementAttributeArgumentsSyntax.isKindOf(raw) || RawUnavailableFromAsyncAttributeArgumentsSyntax.isKindOf(raw) || RawEffectsAttributeArgumentListSyntax.isKindOf(raw) || RawDocumentationAttributeArgumentListSyntax.isKindOf(raw)
+      RawLabeledExprListSyntax.isKindOf(raw) || RawTokenSyntax.isKindOf(raw) || RawStringLiteralExprSyntax.isKindOf(raw) || RawAvailabilityArgumentListSyntax.isKindOf(raw) || RawSpecializeAttributeArgumentListSyntax.isKindOf(raw) || RawObjCSelectorPieceListSyntax.isKindOf(raw) || RawImplementsAttributeArgumentsSyntax.isKindOf(raw) || RawDifferentiableAttributeArgumentsSyntax.isKindOf(raw) || RawDerivativeAttributeArgumentsSyntax.isKindOf(raw) || RawBackDeployedAttributeArgumentsSyntax.isKindOf(raw) || RawConventionAttributeArgumentsSyntax.isKindOf(raw) || RawConventionWitnessMethodAttributeArgumentsSyntax.isKindOf(raw) || RawOpaqueReturnTypeOfAttributeArgumentsSyntax.isKindOf(raw) || RawExposeAttributeArgumentsSyntax.isKindOf(raw) || RawOriginallyDefinedInAttributeArgumentsSyntax.isKindOf(raw) || RawUnderscorePrivateAttributeArgumentsSyntax.isKindOf(raw) || RawDynamicReplacementAttributeArgumentsSyntax.isKindOf(raw) || RawUnavailableFromAsyncAttributeArgumentsSyntax.isKindOf(raw) || RawEffectsAttributeArgumentListSyntax.isKindOf(raw) || RawDocumentationAttributeArgumentListSyntax.isKindOf(raw) || RawABIAttributeArgumentsSyntax.isKindOf(raw)
     }
-    
+
     public var raw: RawSyntax {
       switch self {
       case .argumentList(let node):
@@ -1372,135 +1496,101 @@ public struct RawAttributeSyntax: RawSyntaxNodeProtocol {
         return node.raw
       case .documentationArguments(let node):
         return node.raw
+      case .abiArguments(let node):
+        return node.raw
       }
     }
-    
-    public init?(_ other: some RawSyntaxNodeProtocol) {
-      if let node = RawLabeledExprListSyntax(other) {
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawLabeledExprListSyntax.self) {
         self = .argumentList(node)
-        return
-      }
-      if let node = RawTokenSyntax(other) {
+      } else if let node = node.as(RawTokenSyntax.self) {
         self = .token(node)
-        return
-      }
-      if let node = RawStringLiteralExprSyntax(other) {
+      } else if let node = node.as(RawStringLiteralExprSyntax.self) {
         self = .string(node)
-        return
-      }
-      if let node = RawAvailabilityArgumentListSyntax(other) {
+      } else if let node = node.as(RawAvailabilityArgumentListSyntax.self) {
         self = .availability(node)
-        return
-      }
-      if let node = RawSpecializeAttributeArgumentListSyntax(other) {
+      } else if let node = node.as(RawSpecializeAttributeArgumentListSyntax.self) {
         self = .specializeArguments(node)
-        return
-      }
-      if let node = RawObjCSelectorPieceListSyntax(other) {
+      } else if let node = node.as(RawObjCSelectorPieceListSyntax.self) {
         self = .objCName(node)
-        return
-      }
-      if let node = RawImplementsAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawImplementsAttributeArgumentsSyntax.self) {
         self = .implementsArguments(node)
-        return
-      }
-      if let node = RawDifferentiableAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawDifferentiableAttributeArgumentsSyntax.self) {
         self = .differentiableArguments(node)
-        return
-      }
-      if let node = RawDerivativeAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawDerivativeAttributeArgumentsSyntax.self) {
         self = .derivativeRegistrationArguments(node)
-        return
-      }
-      if let node = RawBackDeployedAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawBackDeployedAttributeArgumentsSyntax.self) {
         self = .backDeployedArguments(node)
-        return
-      }
-      if let node = RawConventionAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawConventionAttributeArgumentsSyntax.self) {
         self = .conventionArguments(node)
-        return
-      }
-      if let node = RawConventionWitnessMethodAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawConventionWitnessMethodAttributeArgumentsSyntax.self) {
         self = .conventionWitnessMethodArguments(node)
-        return
-      }
-      if let node = RawOpaqueReturnTypeOfAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawOpaqueReturnTypeOfAttributeArgumentsSyntax.self) {
         self = .opaqueReturnTypeOfAttributeArguments(node)
-        return
-      }
-      if let node = RawExposeAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawExposeAttributeArgumentsSyntax.self) {
         self = .exposeAttributeArguments(node)
-        return
-      }
-      if let node = RawOriginallyDefinedInAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawOriginallyDefinedInAttributeArgumentsSyntax.self) {
         self = .originallyDefinedInArguments(node)
-        return
-      }
-      if let node = RawUnderscorePrivateAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawUnderscorePrivateAttributeArgumentsSyntax.self) {
         self = .underscorePrivateAttributeArguments(node)
-        return
-      }
-      if let node = RawDynamicReplacementAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawDynamicReplacementAttributeArgumentsSyntax.self) {
         self = .dynamicReplacementArguments(node)
-        return
-      }
-      if let node = RawUnavailableFromAsyncAttributeArgumentsSyntax(other) {
+      } else if let node = node.as(RawUnavailableFromAsyncAttributeArgumentsSyntax.self) {
         self = .unavailableFromAsyncArguments(node)
-        return
-      }
-      if let node = RawEffectsAttributeArgumentListSyntax(other) {
+      } else if let node = node.as(RawEffectsAttributeArgumentListSyntax.self) {
         self = .effectsArguments(node)
-        return
-      }
-      if let node = RawDocumentationAttributeArgumentListSyntax(other) {
+      } else if let node = node.as(RawDocumentationAttributeArgumentListSyntax.self) {
         self = .documentationArguments(node)
-        return
+      } else if let node = node.as(RawABIAttributeArgumentsSyntax.self) {
+        self = .abiArguments(node)
+      } else {
+        return nil
       }
-      return nil
     }
   }
-  
+
   @_spi(RawSyntax)
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .attribute
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAtSign: RawUnexpectedNodesSyntax? = nil, 
-      atSign: RawTokenSyntax, 
-      _ unexpectedBetweenAtSignAndAttributeName: RawUnexpectedNodesSyntax? = nil, 
-      attributeName: RawTypeSyntax, 
-      _ unexpectedBetweenAttributeNameAndLeftParen: RawUnexpectedNodesSyntax? = nil, 
-      leftParen: RawTokenSyntax?, 
-      _ unexpectedBetweenLeftParenAndArguments: RawUnexpectedNodesSyntax? = nil, 
-      arguments: Arguments?, 
-      _ unexpectedBetweenArgumentsAndRightParen: RawUnexpectedNodesSyntax? = nil, 
-      rightParen: RawTokenSyntax?, 
-      _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAtSign: RawUnexpectedNodesSyntax? = nil,
+    atSign: RawTokenSyntax,
+    _ unexpectedBetweenAtSignAndAttributeName: RawUnexpectedNodesSyntax? = nil,
+    attributeName: some RawTypeSyntaxNodeProtocol,
+    _ unexpectedBetweenAttributeNameAndLeftParen: RawUnexpectedNodesSyntax? = nil,
+    leftParen: RawTokenSyntax?,
+    _ unexpectedBetweenLeftParenAndArguments: RawUnexpectedNodesSyntax? = nil,
+    arguments: Arguments?,
+    _ unexpectedBetweenArgumentsAndRightParen: RawUnexpectedNodesSyntax? = nil,
+    rightParen: RawTokenSyntax?,
+    _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .attribute, uninitializedCount: 11, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1518,47 +1608,47 @@ public struct RawAttributeSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAtSign: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var atSign: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAtSignAndAttributeName: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var attributeName: RawTypeSyntax {
     layoutView.children[3].map(RawTypeSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAttributeNameAndLeftParen: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftParen: RawTokenSyntax? {
     layoutView.children[5].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedBetweenLeftParenAndArguments: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var arguments: RawSyntax? {
     layoutView.children[7]
   }
-  
+
   public var unexpectedBetweenArgumentsAndRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightParen: RawTokenSyntax? {
     layoutView.children[9].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[10].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1570,45 +1660,45 @@ public struct RawAttributedTypeSyntax: RawTypeSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .attributedType
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeSpecifier: RawUnexpectedNodesSyntax? = nil, 
-      specifier: RawTokenSyntax?, 
-      _ unexpectedBetweenSpecifierAndAttributes: RawUnexpectedNodesSyntax? = nil, 
-      attributes: RawAttributeListSyntax, 
-      _ unexpectedBetweenAttributesAndBaseType: RawUnexpectedNodesSyntax? = nil, 
-      baseType: RawTypeSyntax, 
-      _ unexpectedAfterBaseType: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeSpecifiers: RawUnexpectedNodesSyntax? = nil,
+    specifiers: RawTypeSpecifierListSyntax,
+    _ unexpectedBetweenSpecifiersAndAttributes: RawUnexpectedNodesSyntax? = nil,
+    attributes: RawAttributeListSyntax,
+    _ unexpectedBetweenAttributesAndBaseType: RawUnexpectedNodesSyntax? = nil,
+    baseType: some RawTypeSyntaxNodeProtocol,
+    _ unexpectedAfterBaseType: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .attributedType, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
-      layout[0] = unexpectedBeforeSpecifier?.raw
-      layout[1] = specifier?.raw
-      layout[2] = unexpectedBetweenSpecifierAndAttributes?.raw
+      layout[0] = unexpectedBeforeSpecifiers?.raw
+      layout[1] = specifiers.raw
+      layout[2] = unexpectedBetweenSpecifiersAndAttributes?.raw
       layout[3] = attributes.raw
       layout[4] = unexpectedBetweenAttributesAndBaseType?.raw
       layout[5] = baseType.raw
@@ -1616,31 +1706,31 @@ public struct RawAttributedTypeSyntax: RawTypeSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
-  public var unexpectedBeforeSpecifier: RawUnexpectedNodesSyntax? {
+
+  public var unexpectedBeforeSpecifiers: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
-  public var specifier: RawTokenSyntax? {
-    layoutView.children[1].map(RawTokenSyntax.init(raw:))
+
+  public var specifiers: RawTypeSpecifierListSyntax {
+    layoutView.children[1].map(RawTypeSpecifierListSyntax.init(raw:))!
   }
-  
-  public var unexpectedBetweenSpecifierAndAttributes: RawUnexpectedNodesSyntax? {
+
+  public var unexpectedBetweenSpecifiersAndAttributes: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var attributes: RawAttributeListSyntax {
     layoutView.children[3].map(RawAttributeListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAttributesAndBaseType: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var baseType: RawTypeSyntax {
     layoutView.children[5].map(RawTypeSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterBaseType: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1652,29 +1742,29 @@ public struct RawAvailabilityArgumentListSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .availabilityArgumentList
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(elements: [RawAvailabilityArgumentSyntax], arena: __shared SyntaxArena) {
     let raw = RawSyntax.makeLayout(
       kind: .availabilityArgumentList, uninitializedCount: elements.count, arena: arena) { layout in
@@ -1688,7 +1778,7 @@ public struct RawAvailabilityArgumentListSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var elements: [RawAvailabilityArgumentSyntax] {
     layoutView.children.map {
       RawAvailabilityArgumentSyntax(raw: $0!)
@@ -1699,14 +1789,19 @@ public struct RawAvailabilityArgumentListSyntax: RawSyntaxNodeProtocol {
 @_spi(RawSyntax)
 public struct RawAvailabilityArgumentSyntax: RawSyntaxNodeProtocol {
   public enum Argument: RawSyntaxNodeProtocol {
-    case `token`(RawTokenSyntax)
-    case `availabilityVersionRestriction`(RawPlatformVersionSyntax)
-    case `availabilityLabeledArgument`(RawAvailabilityLabeledArgumentSyntax)
-    
+    /// ### Tokens
+    /// 
+    /// For syntax trees generated by the parser, this is guaranteed to be one of the following kinds:
+    ///  - `<binaryOperator>`
+    ///  - `<identifier>`
+    case token(RawTokenSyntax)
+    case availabilityVersionRestriction(RawPlatformVersionSyntax)
+    case availabilityLabeledArgument(RawAvailabilityLabeledArgumentSyntax)
+
     public static func isKindOf(_ raw: RawSyntax) -> Bool {
-      return RawTokenSyntax.isKindOf(raw) || RawPlatformVersionSyntax.isKindOf(raw) || RawAvailabilityLabeledArgumentSyntax.isKindOf(raw)
+      RawTokenSyntax.isKindOf(raw) || RawPlatformVersionSyntax.isKindOf(raw) || RawAvailabilityLabeledArgumentSyntax.isKindOf(raw)
     }
-    
+
     public var raw: RawSyntax {
       switch self {
       case .token(let node):
@@ -1717,59 +1812,55 @@ public struct RawAvailabilityArgumentSyntax: RawSyntaxNodeProtocol {
         return node.raw
       }
     }
-    
-    public init?(_ other: some RawSyntaxNodeProtocol) {
-      if let node = RawTokenSyntax(other) {
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawTokenSyntax.self) {
         self = .token(node)
-        return
-      }
-      if let node = RawPlatformVersionSyntax(other) {
+      } else if let node = node.as(RawPlatformVersionSyntax.self) {
         self = .availabilityVersionRestriction(node)
-        return
-      }
-      if let node = RawAvailabilityLabeledArgumentSyntax(other) {
+      } else if let node = node.as(RawAvailabilityLabeledArgumentSyntax.self) {
         self = .availabilityLabeledArgument(node)
-        return
+      } else {
+        return nil
       }
-      return nil
     }
   }
-  
+
   @_spi(RawSyntax)
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .availabilityArgument
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeArgument: RawUnexpectedNodesSyntax? = nil, 
-      argument: Argument, 
-      _ unexpectedBetweenArgumentAndTrailingComma: RawUnexpectedNodesSyntax? = nil, 
-      trailingComma: RawTokenSyntax?, 
-      _ unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeArgument: RawUnexpectedNodesSyntax? = nil,
+    argument: Argument,
+    _ unexpectedBetweenArgumentAndTrailingComma: RawUnexpectedNodesSyntax? = nil,
+    trailingComma: RawTokenSyntax?,
+    _ unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .availabilityArgument, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1781,23 +1872,23 @@ public struct RawAvailabilityArgumentSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeArgument: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var argument: RawSyntax {
     layoutView.children[1]!
   }
-  
+
   public var unexpectedBetweenArgumentAndTrailingComma: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var trailingComma: RawTokenSyntax? {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterTrailingComma: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1809,41 +1900,41 @@ public struct RawAvailabilityConditionSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .availabilityCondition
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAvailabilityKeyword: RawUnexpectedNodesSyntax? = nil, 
-      availabilityKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenAvailabilityKeywordAndLeftParen: RawUnexpectedNodesSyntax? = nil, 
-      leftParen: RawTokenSyntax, 
-      _ unexpectedBetweenLeftParenAndAvailabilityArguments: RawUnexpectedNodesSyntax? = nil, 
-      availabilityArguments: RawAvailabilityArgumentListSyntax, 
-      _ unexpectedBetweenAvailabilityArgumentsAndRightParen: RawUnexpectedNodesSyntax? = nil, 
-      rightParen: RawTokenSyntax, 
-      _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAvailabilityKeyword: RawUnexpectedNodesSyntax? = nil,
+    availabilityKeyword: RawTokenSyntax,
+    _ unexpectedBetweenAvailabilityKeywordAndLeftParen: RawUnexpectedNodesSyntax? = nil,
+    leftParen: RawTokenSyntax,
+    _ unexpectedBetweenLeftParenAndAvailabilityArguments: RawUnexpectedNodesSyntax? = nil,
+    availabilityArguments: RawAvailabilityArgumentListSyntax,
+    _ unexpectedBetweenAvailabilityArgumentsAndRightParen: RawUnexpectedNodesSyntax? = nil,
+    rightParen: RawTokenSyntax,
+    _ unexpectedAfterRightParen: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .availabilityCondition, uninitializedCount: 9, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1859,39 +1950,39 @@ public struct RawAvailabilityConditionSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAvailabilityKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var availabilityKeyword: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAvailabilityKeywordAndLeftParen: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var leftParen: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLeftParenAndAvailabilityArguments: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var availabilityArguments: RawAvailabilityArgumentListSyntax {
     layoutView.children[5].map(RawAvailabilityArgumentListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAvailabilityArgumentsAndRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var rightParen: RawTokenSyntax {
     layoutView.children[7].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterRightParen: RawUnexpectedNodesSyntax? {
     layoutView.children[8].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -1900,13 +1991,13 @@ public struct RawAvailabilityConditionSyntax: RawSyntaxNodeProtocol {
 @_spi(RawSyntax)
 public struct RawAvailabilityLabeledArgumentSyntax: RawSyntaxNodeProtocol {
   public enum Value: RawSyntaxNodeProtocol {
-    case `string`(RawSimpleStringLiteralExprSyntax)
-    case `version`(RawVersionTupleSyntax)
-    
+    case string(RawSimpleStringLiteralExprSyntax)
+    case version(RawVersionTupleSyntax)
+
     public static func isKindOf(_ raw: RawSyntax) -> Bool {
-      return RawSimpleStringLiteralExprSyntax.isKindOf(raw) || RawVersionTupleSyntax.isKindOf(raw)
+      RawSimpleStringLiteralExprSyntax.isKindOf(raw) || RawVersionTupleSyntax.isKindOf(raw)
     }
-    
+
     public var raw: RawSyntax {
       switch self {
       case .string(let node):
@@ -1915,57 +2006,55 @@ public struct RawAvailabilityLabeledArgumentSyntax: RawSyntaxNodeProtocol {
         return node.raw
       }
     }
-    
-    public init?(_ other: some RawSyntaxNodeProtocol) {
-      if let node = RawSimpleStringLiteralExprSyntax(other) {
+
+    public init?(_ node: __shared some RawSyntaxNodeProtocol) {
+      if let node = node.as(RawSimpleStringLiteralExprSyntax.self) {
         self = .string(node)
-        return
-      }
-      if let node = RawVersionTupleSyntax(other) {
+      } else if let node = node.as(RawVersionTupleSyntax.self) {
         self = .version(node)
-        return
+      } else {
+        return nil
       }
-      return nil
     }
   }
-  
+
   @_spi(RawSyntax)
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .availabilityLabeledArgument
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLabel: RawUnexpectedNodesSyntax? = nil, 
-      label: RawTokenSyntax, 
-      _ unexpectedBetweenLabelAndColon: RawUnexpectedNodesSyntax? = nil, 
-      colon: RawTokenSyntax, 
-      _ unexpectedBetweenColonAndValue: RawUnexpectedNodesSyntax? = nil, 
-      value: Value, 
-      _ unexpectedAfterValue: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLabel: RawUnexpectedNodesSyntax? = nil,
+    label: RawTokenSyntax,
+    _ unexpectedBetweenLabelAndColon: RawUnexpectedNodesSyntax? = nil,
+    colon: RawTokenSyntax,
+    _ unexpectedBetweenColonAndValue: RawUnexpectedNodesSyntax? = nil,
+    value: Value,
+    _ unexpectedAfterValue: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .availabilityLabeledArgument, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -1979,31 +2068,31 @@ public struct RawAvailabilityLabeledArgumentSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLabel: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var label: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenLabelAndColon: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var colon: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenColonAndValue: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var value: RawSyntax {
     layoutView.children[5]!
   }
-  
+
   public var unexpectedAfterValue: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2015,37 +2104,37 @@ public struct RawAwaitExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .awaitExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeAwaitKeyword: RawUnexpectedNodesSyntax? = nil, 
-      awaitKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenAwaitKeywordAndExpression: RawUnexpectedNodesSyntax? = nil, 
-      expression: RawExprSyntax, 
-      _ unexpectedAfterExpression: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeAwaitKeyword: RawUnexpectedNodesSyntax? = nil,
+    awaitKeyword: RawTokenSyntax,
+    _ unexpectedBetweenAwaitKeywordAndExpression: RawUnexpectedNodesSyntax? = nil,
+    expression: some RawExprSyntaxNodeProtocol,
+    _ unexpectedAfterExpression: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .awaitExpr, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2057,23 +2146,23 @@ public struct RawAwaitExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeAwaitKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var awaitKeyword: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenAwaitKeywordAndExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var expression: RawExprSyntax {
     layoutView.children[3].map(RawExprSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2085,39 +2174,39 @@ public struct RawBackDeployedAttributeArgumentsSyntax: RawSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .backDeployedAttributeArguments
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeBeforeLabel: RawUnexpectedNodesSyntax? = nil, 
-      beforeLabel: RawTokenSyntax, 
-      _ unexpectedBetweenBeforeLabelAndColon: RawUnexpectedNodesSyntax? = nil, 
-      colon: RawTokenSyntax, 
-      _ unexpectedBetweenColonAndPlatforms: RawUnexpectedNodesSyntax? = nil, 
-      platforms: RawPlatformVersionItemListSyntax, 
-      _ unexpectedAfterPlatforms: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeBeforeLabel: RawUnexpectedNodesSyntax? = nil,
+    beforeLabel: RawTokenSyntax,
+    _ unexpectedBetweenBeforeLabelAndColon: RawUnexpectedNodesSyntax? = nil,
+    colon: RawTokenSyntax,
+    _ unexpectedBetweenColonAndPlatforms: RawUnexpectedNodesSyntax? = nil,
+    platforms: RawPlatformVersionItemListSyntax,
+    _ unexpectedAfterPlatforms: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .backDeployedAttributeArguments, uninitializedCount: 7, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2131,31 +2220,31 @@ public struct RawBackDeployedAttributeArgumentsSyntax: RawSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeBeforeLabel: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var beforeLabel: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenBeforeLabelAndColon: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var colon: RawTokenSyntax {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenColonAndPlatforms: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var platforms: RawPlatformVersionItemListSyntax {
     layoutView.children[5].map(RawPlatformVersionItemListSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterPlatforms: RawUnexpectedNodesSyntax? {
     layoutView.children[6].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2167,35 +2256,35 @@ public struct RawBinaryOperatorExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .binaryOperatorExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeOperator: RawUnexpectedNodesSyntax? = nil, 
-      operator: RawTokenSyntax, 
-      _ unexpectedAfterOperator: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeOperator: RawUnexpectedNodesSyntax? = nil,
+    operator: RawTokenSyntax,
+    _ unexpectedAfterOperator: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .binaryOperatorExpr, uninitializedCount: 3, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2205,15 +2294,15 @@ public struct RawBinaryOperatorExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeOperator: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var `operator`: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterOperator: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2225,35 +2314,35 @@ public struct RawBooleanLiteralExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .booleanLiteralExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeLiteral: RawUnexpectedNodesSyntax? = nil, 
-      literal: RawTokenSyntax, 
-      _ unexpectedAfterLiteral: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeLiteral: RawUnexpectedNodesSyntax? = nil,
+    literal: RawTokenSyntax,
+    _ unexpectedAfterLiteral: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .booleanLiteralExpr, uninitializedCount: 3, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2263,15 +2352,15 @@ public struct RawBooleanLiteralExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeLiteral: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var literal: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterLiteral: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2283,37 +2372,37 @@ public struct RawBorrowExprSyntax: RawExprSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .borrowExpr
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeBorrowKeyword: RawUnexpectedNodesSyntax? = nil, 
-      borrowKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenBorrowKeywordAndExpression: RawUnexpectedNodesSyntax? = nil, 
-      expression: RawExprSyntax, 
-      _ unexpectedAfterExpression: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeBorrowKeyword: RawUnexpectedNodesSyntax? = nil,
+    borrowKeyword: RawTokenSyntax,
+    _ unexpectedBetweenBorrowKeywordAndExpression: RawUnexpectedNodesSyntax? = nil,
+    expression: some RawExprSyntaxNodeProtocol,
+    _ unexpectedAfterExpression: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .borrowExpr, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2325,23 +2414,23 @@ public struct RawBorrowExprSyntax: RawExprSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeBorrowKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var borrowKeyword: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenBorrowKeywordAndExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var expression: RawExprSyntax {
     layoutView.children[3].map(RawExprSyntax.init(raw:))!
   }
-  
+
   public var unexpectedAfterExpression: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }
@@ -2353,37 +2442,37 @@ public struct RawBreakStmtSyntax: RawStmtSyntaxNodeProtocol {
   public var layoutView: RawSyntaxLayoutView {
     return raw.layoutView!
   }
-  
+
   public static func isKindOf(_ raw: RawSyntax) -> Bool {
     return raw.kind == .breakStmt
   }
-  
+
   public var raw: RawSyntax
-  
+
   init(raw: RawSyntax) {
     precondition(Self.isKindOf(raw))
     self.raw = raw
   }
-  
+
   private init(unchecked raw: RawSyntax) {
     self.raw = raw
   }
-  
+
   public init?(_ other: some RawSyntaxNodeProtocol) {
     guard Self.isKindOf(other.raw) else {
       return nil
     }
     self.init(unchecked: other.raw)
   }
-  
+
   public init(
-      _ unexpectedBeforeBreakKeyword: RawUnexpectedNodesSyntax? = nil, 
-      breakKeyword: RawTokenSyntax, 
-      _ unexpectedBetweenBreakKeywordAndLabel: RawUnexpectedNodesSyntax? = nil, 
-      label: RawTokenSyntax?, 
-      _ unexpectedAfterLabel: RawUnexpectedNodesSyntax? = nil, 
-      arena: __shared SyntaxArena
-    ) {
+    _ unexpectedBeforeBreakKeyword: RawUnexpectedNodesSyntax? = nil,
+    breakKeyword: RawTokenSyntax,
+    _ unexpectedBetweenBreakKeywordAndLabel: RawUnexpectedNodesSyntax? = nil,
+    label: RawTokenSyntax?,
+    _ unexpectedAfterLabel: RawUnexpectedNodesSyntax? = nil,
+    arena: __shared SyntaxArena
+  ) {
     let raw = RawSyntax.makeLayout(
       kind: .breakStmt, uninitializedCount: 5, arena: arena) { layout in
       layout.initialize(repeating: nil)
@@ -2395,23 +2484,23 @@ public struct RawBreakStmtSyntax: RawStmtSyntaxNodeProtocol {
     }
     self.init(unchecked: raw)
   }
-  
+
   public var unexpectedBeforeBreakKeyword: RawUnexpectedNodesSyntax? {
     layoutView.children[0].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var breakKeyword: RawTokenSyntax {
     layoutView.children[1].map(RawTokenSyntax.init(raw:))!
   }
-  
+
   public var unexpectedBetweenBreakKeywordAndLabel: RawUnexpectedNodesSyntax? {
     layoutView.children[2].map(RawUnexpectedNodesSyntax.init(raw:))
   }
-  
+
   public var label: RawTokenSyntax? {
     layoutView.children[3].map(RawTokenSyntax.init(raw:))
   }
-  
+
   public var unexpectedAfterLabel: RawUnexpectedNodesSyntax? {
     layoutView.children[4].map(RawUnexpectedNodesSyntax.init(raw:))
   }

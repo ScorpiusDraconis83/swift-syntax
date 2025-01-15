@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 /// A rewriter that performs a "basic" format of the passed tree.
 ///
@@ -67,6 +71,16 @@ open class BasicFormat: SyntaxRewriter {
     self.indentationWidth = indentationWidth ?? .spaces(4)
     self.indentationStack = [(indentation: initialIndentation, isUserDefined: false)]
     super.init(viewMode: viewMode)
+  }
+
+  /// Clears all stateful data from this `BasicFormat`.
+  ///
+  /// This needs to be called between multiple `rewrite` calls to a syntax tree.
+  func reset() {
+    indentationStack = [indentationStack.first!]
+    anchorPoints = [:]
+    previousToken = nil
+    stringLiteralNestingLevel = 0
   }
 
   // MARK: - Updating indentation level
@@ -134,7 +148,7 @@ open class BasicFormat: SyntaxRewriter {
       return true
     case .ifConfigClauseList:
       return true
-    case .memberDeclList:
+    case .memberBlockItemList:
       return true
     case .switchCaseList:
       return true
@@ -145,7 +159,7 @@ open class BasicFormat: SyntaxRewriter {
 
   /// Find the indentation of the nearest ancestor whose first token is an
   /// anchor point (see `anchorPoints`).
-  private func anchorPointIndentation(for token: TokenSyntax) -> Trivia? {
+  private func anchorPointIndentation(for token: TokenSyntax) -> Trivia {
     var ancestor: Syntax = Syntax(token)
     while let parent = ancestor.parent {
       ancestor = parent
@@ -155,7 +169,7 @@ open class BasicFormat: SyntaxRewriter {
         return anchorPointIndentation
       }
     }
-    return nil
+    return Trivia()
   }
 
   // MARK: - Customization points
@@ -274,8 +288,10 @@ open class BasicFormat: SyntaxRewriter {
     case (.multilineStringQuote, .backslash),  // string interpolation segment inside a multi-line string literal
       (.multilineStringQuote, .multilineStringQuote),  // empty multi-line string literal
       (.multilineStringQuote, .stringSegment),  // segment starting a multi-line string literal
-      (.stringSegment, .multilineStringQuote),  // ending a multi-line string literal that has a string interpolation segment at its end
-      (.rightParen, .multilineStringQuote),  // ending a multi-line string literal that has a string interpolation segment at its end
+      // ending a multi-line string literal that has a string interpolation segment at its end
+      (.stringSegment, .multilineStringQuote),
+      // ending a multi-line string literal that has a string interpolation segment at its end
+      (.rightParen, .multilineStringQuote),
       (.poundEndif, _),
       (_, .poundElse),
       (_, .poundElseif),
@@ -294,41 +310,32 @@ open class BasicFormat: SyntaxRewriter {
       (.backtick, _),
       (.dollarIdentifier, .period),  // a.b
       (.endOfFile, _),
-      (.exclamationMark, .leftParen),  // myOptionalClosure!()
       (.exclamationMark, .period),  // myOptionalBar!.foo()
-      (.regexPoundDelimiter, .leftParen),  // opening extended regex delimiter should never be separate by a space
       (.regexPoundDelimiter, .regexSlash),  // opening extended regex delimiter should never be separate by a space
       (.identifier, .leftAngle),  // MyType<Int>
-      (.identifier, .leftParen),  // foo()
       (.identifier, .leftSquare),  // myArray[1]
       (.identifier, .period),  // a.b
       (.integerLiteral, .period),  // macOS 11.2.1
       (.keyword(.Any), .period),  // Any.Type
       (.keyword(.`init`), .leftAngle),  // init<T>()
-      (.keyword(.`init`), .leftParen),  // init()
       (.keyword(.self), .period),  // self.someProperty
-      (.keyword(.self), .leftParen),  // self()
       (.keyword(.self), .leftSquare),  // self[]
       (.keyword(.Self), .period),  // Self.someProperty
-      (.keyword(.Self), .leftParen),  // Self()
       (.keyword(.Self), .leftSquare),  // Self[]
-      (.keyword(.set), .leftParen),  // var mVar: Int { set(value) {} }
-      (.keyword(.subscript), .leftParen),  // subscript(x: Int)
       (.keyword(.super), .period),  // super.someProperty
       (.leftBrace, .rightBrace),  // {}
       (.leftParen, _),
       (.leftSquare, _),
-      (.multilineStringQuote, .rawStringPoundDelimiter),  // closing raw string delimiter should never be separate by a space
+      // closing raw string delimiter should never be separate by a space
+      (.multilineStringQuote, .rawStringPoundDelimiter),
       (.period, _),
       (.postfixQuestionMark, .leftAngle),  // init?<T>()
-      (.postfixQuestionMark, .leftParen),  // init?() or myOptionalClosure?()
       (.postfixQuestionMark, .period),  // someOptional?.someProperty
       (.pound, _),
-      (.poundUnavailable, .leftParen),  // #unavailable(...)
       (.prefixAmpersand, _),
       (.prefixOperator, _),
-      (.rawStringPoundDelimiter, .leftParen),  // opening raw string delimiter should never be separate by a space
-      (.rawStringPoundDelimiter, .multilineStringQuote),  // opening raw string delimiter should never be separate by a space
+      // opening raw string delimiter should never be separate by a space
+      (.rawStringPoundDelimiter, .multilineStringQuote),
       (.rawStringPoundDelimiter, .singleQuote),  // opening raw string delimiter should never be separate by a space
       (.rawStringPoundDelimiter, .stringQuote),  // opening raw string delimiter should never be separate by a space
       (.rawStringPoundDelimiter, .period),  // opening raw string delimiter should never be separate by a space
@@ -336,10 +343,7 @@ open class BasicFormat: SyntaxRewriter {
       (.regexPoundDelimiter, .period),  // #/myRegex/#.someMember
       (.regexSlash, .regexPoundDelimiter),  // closing extended regex delimiter should never be separate by a space
       (.regexSlash, .period),  // /myRegex/.someMember
-      (.rightAngle, .leftParen),  // func foo<T>(x: T)
       (.rightAngle, .period),  // Foo<T>.bar
-      (.rightBrace, .leftParen),  // { return 1 }()
-      (.rightParen, .leftParen),  // returnsClosure()()
       (.rightParen, .period),  // foo().bar
       (.rightSquare, .period),  // myArray[1].someProperty
       (.singleQuote, .rawStringPoundDelimiter),  // closing raw string delimiter should never be separate by a space
@@ -359,15 +363,31 @@ open class BasicFormat: SyntaxRewriter {
       (nil, _):
       return false
     case (_, .colon):
-      if second?.keyPathInParent != \TernaryExprSyntax.colon
-        && second?.keyPathInParent != \UnresolvedTernaryExprSyntax.colon
-      {
+      switch second?.keyPathInParent {
+      case \TernaryExprSyntax.colon,
+        \UnresolvedTernaryExprSyntax.colon:
+        break
+      default:
         return false
       }
-    case (.leftAngle, _) where second?.tokenKind != .rightAngle:  // `<` and `>` need to be separated by a space because otherwise they become an operator
+    case (.leftAngle, _) where second?.tokenKind != .rightAngle:
+      // `<` and `>` need to be separated by a space because otherwise they become an operator
       return false
-    case (_, .rightAngle) where first?.tokenKind != .leftAngle:  // `<` and `>` need to be separated by a space because otherwise they become an operator
+    case (_, .rightAngle) where first?.tokenKind != .leftAngle:
+      // `<` and `>` need to be separated by a space because otherwise they become an operator
       return false
+    case (_, .leftParen):
+      switch second?.keyPathInParent {
+      case \ClosureParameterClauseSyntax.leftParen,
+        \FunctionTypeSyntax.leftParen,
+        \TupleExprSyntax.leftParen,
+        \TuplePatternSyntax.leftParen,
+        \TupleTypeSyntax.leftParen:
+        break
+      default:
+        return false
+      }
+
     default:
       break
     }
@@ -519,7 +539,9 @@ open class BasicFormat: SyntaxRewriter {
         return true
       } else if token.text.first?.isNewline ?? false {
         return true
-      } else if (transformedTokenText ?? token.text).isEmpty && token.trailingTrivia.isEmpty && nextTokenWillStartWithNewline {
+      } else if (transformedTokenText ?? token.text).isEmpty && token.trailingTrivia.isEmpty
+        && nextTokenWillStartWithNewline
+      {
         return true
       } else {
         return false
@@ -545,7 +567,9 @@ open class BasicFormat: SyntaxRewriter {
       }
     }
 
-    if leadingTrivia.indentation(isOnNewline: isInitialToken || previousTokenWillEndWithNewline) == [] && !token.isStringSegment {
+    if leadingTrivia.indentation(isOnNewline: isInitialToken || previousTokenWillEndWithNewline) == []
+      && !token.isStringSegment
+    {
       // If the token starts on a new line and does not have indentation, this
       // is the last non-indented token. Store its indentation level.
       // But never consider string segments as anchor points since you can’t
@@ -575,30 +599,46 @@ open class BasicFormat: SyntaxRewriter {
       trailingTrivia += .space
     }
 
-    var leadingTriviaIndentation = self.currentIndentationLevel
-    var trailingTriviaIndentation = self.currentIndentationLevel
+    let leadingTriviaIndentation: Trivia
+    let trailingTriviaIndentation: Trivia
 
     // If the trivia contains user-defined indentation, find their anchor point
     // and indent the token relative to that anchor point.
+    //
     // Always indent string literals relative to their anchor point because
     // their indentation has structural meaning and we just want to maintain
     // what the user wrote.
-    if leadingTrivia.containsIndentation(isOnNewline: previousTokenWillEndWithNewline) || isInsideStringLiteral,
-      let anchorPointIndentation = self.anchorPointIndentation(for: token)
-    {
-      leadingTriviaIndentation = anchorPointIndentation
+    if leadingTrivia.containsIndentation(isOnNewline: previousTokenWillEndWithNewline) || isInsideStringLiteral {
+      leadingTriviaIndentation = anchorPointIndentation(for: token)
+    } else {
+      leadingTriviaIndentation = currentIndentationLevel
     }
-    if combinedTrailingTrivia.containsIndentation(isOnNewline: previousTokenWillEndWithNewline) || isInsideStringLiteral,
-      let anchorPointIndentation = self.anchorPointIndentation(for: token)
-    {
-      trailingTriviaIndentation = anchorPointIndentation
+    if combinedTrailingTrivia.containsIndentation(isOnNewline: previousTokenWillEndWithNewline) {
+      trailingTriviaIndentation = anchorPointIndentation(for: token)
+    } else {
+      trailingTriviaIndentation = currentIndentationLevel
     }
 
-    leadingTrivia = leadingTrivia.indented(indentation: leadingTriviaIndentation, isOnNewline: previousTokenIsStringLiteralEndingInNewline)
-    trailingTrivia = trailingTrivia.indented(indentation: trailingTriviaIndentation, isOnNewline: false)
+    leadingTrivia = leadingTrivia.indented(
+      indentation: leadingTriviaIndentation,
+      isOnNewline: previousTokenIsStringLiteralEndingInNewline || previousTokenWillEndWithNewline
+    )
+    trailingTrivia = trailingTrivia.indented(
+      indentation: trailingTriviaIndentation,
+      isOnNewline: false,
+      // Don't add indentation to the last newline.
+      // Its indentation will be added to the next token's leading trivia, which
+      // might have a different indentation scope than this token (in particular
+      // if this token is a closing brace).
+      addIndentationAfterLastNewline: false
+    )
 
-    leadingTrivia = leadingTrivia.trimmingTrailingWhitespaceBeforeNewline(isBeforeNewline: leadingTriviaIsFollowedByNewline)
-    trailingTrivia = trailingTrivia.trimmingTrailingWhitespaceBeforeNewline(isBeforeNewline: nextTokenWillStartWithNewline)
+    leadingTrivia = leadingTrivia.trimmingTrailingWhitespaceBeforeNewline(
+      isBeforeNewline: leadingTriviaIsFollowedByNewline
+    )
+    trailingTrivia = trailingTrivia.trimmingTrailingWhitespaceBeforeNewline(
+      isBeforeNewline: nextTokenWillStartWithNewline
+    )
 
     var result = token.detached
     if leadingTrivia != result.leadingTrivia {
@@ -634,19 +674,5 @@ fileprivate extension TokenSyntax {
     default:
       return false
     }
-  }
-}
-
-fileprivate extension SyntaxProtocol {
-  /// Returns this node or the first ancestor that satisfies `condition`.
-  func ancestorOrSelf<T>(mapping map: (Syntax) -> T?) -> T? {
-    var walk: Syntax? = Syntax(self)
-    while let unwrappedParent = walk {
-      if let mapped = map(unwrappedParent) {
-        return mapped
-      }
-      walk = unwrappedParent.parent
-    }
-    return nil
   }
 }

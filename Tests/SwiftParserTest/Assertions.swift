@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftDiagnostics
+@_spi(FixItApplier) import SwiftIDEUtils
 @_spi(Testing) @_spi(RawSyntax) @_spi(AlternateTokenIntrospection) @_spi(ExperimentalLanguageFeatures) import SwiftParser
 @_spi(RawSyntax) import SwiftParserDiagnostics
 @_spi(RawSyntax) import SwiftSyntax
@@ -40,7 +41,7 @@ struct LexemeSpec {
     errorLocationMarker: String = "1️⃣",
     diagnostic: String? = nil,
     flags: Lexer.Lexeme.Flags = [],
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
   ) {
     self.rawTokenKind = rawTokenKind
@@ -69,7 +70,7 @@ private func assertTokens(
   _ actual: [Lexer.Lexeme],
   _ expected: [LexemeSpec],
   markerLocations: [String: Int],
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   guard actual.count == expected.count else {
@@ -98,7 +99,7 @@ private func assertTokens(
     }
 
     if actualLexeme.leadingTriviaText != expectedLexeme.leadingTrivia {
-      failStringsEqualWithDiff(
+      assertStringsEqualWithDiff(
         String(syntaxText: actualLexeme.leadingTriviaText),
         String(syntaxText: expectedLexeme.leadingTrivia),
         "Leading trivia does not match",
@@ -108,7 +109,7 @@ private func assertTokens(
     }
 
     if actualLexeme.tokenText.debugDescription != expectedLexeme.tokenText.debugDescription {
-      failStringsEqualWithDiff(
+      assertStringsEqualWithDiff(
         actualLexeme.tokenText.debugDescription,
         expectedLexeme.tokenText.debugDescription,
         "Token text does not match",
@@ -118,7 +119,7 @@ private func assertTokens(
     }
 
     if actualLexeme.trailingTriviaText != expectedLexeme.trailingTrivia {
-      failStringsEqualWithDiff(
+      assertStringsEqualWithDiff(
         String(syntaxText: actualLexeme.trailingTriviaText),
         String(syntaxText: expectedLexeme.trailingTrivia),
         "Trailing trivia does not match",
@@ -142,8 +143,19 @@ private func assertTokens(
         line: expectedLexeme.line
       )
     case (let actualError?, let expectedError?):
+      // Create a token from the lexeme so we can pass it to `TokenDiagnostic.diagnosticMessage(in:)`
+      let arena = ParsingSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
+      let rawToken = RawTokenSyntax(
+        kind: actualLexeme.rawTokenKind,
+        wholeText: arena.intern(actualLexeme.wholeText),
+        textRange: actualLexeme.textRange,
+        presence: .present,
+        tokenDiagnostic: actualLexeme.diagnostic,
+        arena: arena
+      )
+      let token = Syntax(raw: RawSyntax(rawToken), rawNodeArena: arena).cast(TokenSyntax.self)
       assertStringsEqualWithDiff(
-        actualError.diagnosticMessage(wholeTextBytes: Array(actualLexeme.wholeText)).message,
+        actualError.diagnosticMessage(in: token).message,
         expectedError,
         file: expectedLexeme.file,
         line: expectedLexeme.line
@@ -178,7 +190,7 @@ private func assertTokens(
 func assertLexemes(
   _ markedSource: String,
   lexemes expectedLexemes: [LexemeSpec],
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   var (markerLocations, source) = extractMarkers(markedSource)
@@ -221,7 +233,7 @@ struct NoteSpec {
   init(
     locationMarker: String = "ℹ️",
     message: String,
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
   ) {
     self.locationMarker = locationMarker
@@ -261,7 +273,7 @@ struct DiagnosticSpec {
     highlight: String? = nil,
     notes: [NoteSpec] = [],
     fixIts: [String] = [],
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
   ) {
     self.locationMarker = locationMarker
@@ -277,9 +289,9 @@ struct DiagnosticSpec {
 }
 
 /// Assert that `location` is the same as that of `locationMarker` in `tree`.
-func assertLocation<T: SyntaxProtocol>(
+func assertLocation(
   _ location: SourceLocation,
-  in tree: T,
+  in tree: some SyntaxProtocol,
   markerLocations: [String: Int],
   expectedLocationMarker locationMarker: String,
   file: StaticString = #filePath,
@@ -303,9 +315,9 @@ func assertLocation<T: SyntaxProtocol>(
 
 /// Assert that the diagnostic `note` produced in `tree` matches `spec`,
 /// using `markerLocations` to translate markers to actual source locations.
-func assertNote<T: SyntaxProtocol>(
+func assertNote(
   _ note: Note,
-  in tree: T,
+  in tree: some SyntaxProtocol,
   markerLocations: [String: Int],
   expected spec: NoteSpec
 ) {
@@ -323,9 +335,9 @@ func assertNote<T: SyntaxProtocol>(
 
 /// Assert that the diagnostic `diag` produced in `tree` matches `spec`,
 /// using `markerLocations` to translate markers to actual source locations.
-func assertDiagnostic<T: SyntaxProtocol>(
+func assertDiagnostic(
   _ diag: Diagnostic,
-  in tree: T,
+  in tree: some SyntaxProtocol,
   markerLocations: [String: Int],
   expected spec: DiagnosticSpec
 ) {
@@ -390,7 +402,7 @@ func assertDiagnostic<T: SyntaxProtocol>(
       line: spec.line
     )
   } else if spec.fixIts != diag.fixIts.map(\.message.message) {
-    failStringsEqualWithDiff(
+    assertStringsEqualWithDiff(
       diag.fixIts.map(\.message.message).joined(separator: "\n"),
       spec.fixIts.joined(separator: "\n"),
       file: spec.file,
@@ -460,7 +472,7 @@ class TokenPresenceFlipper: SyntaxRewriter {
   }
 }
 
-public struct AssertParseOptions: OptionSet {
+public struct AssertParseOptions: OptionSet, Sendable {
   public var rawValue: UInt8
 
   public init(rawValue: UInt8) {
@@ -479,9 +491,10 @@ public struct AssertParseOptions: OptionSet {
 extension ParserTestCase {
   /// After a test case has been mutated, assert that the mutated source
   /// round-trips and doesn’t hit any assertion failures in the parser.
-  fileprivate func assertMutationRoundTrip<S: SyntaxProtocol>(
+  fileprivate static func assertMutationRoundTrip(
     source: [UInt8],
-    _ parse: (inout Parser) -> S,
+    _ parse: (inout Parser) -> some SyntaxProtocol,
+    swiftVersion: Parser.SwiftVersion?,
     experimentalFeatures: Parser.ExperimentalFeatures,
     file: StaticString,
     line: UInt
@@ -490,7 +503,7 @@ extension ParserTestCase {
       let mutatedSource = String(decoding: buf, as: UTF8.self)
       // Check that we don't hit any assertions in the parser while parsing
       // the mutated source and that it round-trips
-      var mutatedParser = Parser(buf, experimentalFeatures: experimentalFeatures)
+      var mutatedParser = Parser(buf, swiftVersion: swiftVersion, experimentalFeatures: experimentalFeatures)
       let mutatedTree = parse(&mutatedParser)
       // Run the diagnostic generator to make sure it doesn’t crash
       _ = ParseDiagnosticsGenerator.diagnostics(for: mutatedTree)
@@ -511,6 +524,76 @@ extension ParserTestCase {
     }
   }
 
+  enum FixItsApplication {
+    /// Apply only the fix-its whose messages are included in `applyFixIts` to generate `fixedSource`.
+    case optIn(applyFixIts: [String], fixedSource: String)
+    /// Apply all fix-its to generate `fixedSource`.
+    case all(fixedSource: String)
+
+    init?(applyFixIts: [String]?, expectedFixedSource: String?) {
+      if let applyFixIts {
+        self = .optIn(applyFixIts: applyFixIts, fixedSource: expectedFixedSource ?? "")
+      } else if let expectedFixedSource {
+        self = .all(fixedSource: expectedFixedSource)
+      } else {
+        return nil
+      }
+    }
+
+    var applyFixIts: [String]? {
+      switch self {
+      case .optIn(let applyFixIts, _):
+        return applyFixIts
+      case .all:
+        return nil
+      }
+    }
+
+    var expectedFixedSource: String {
+      switch self {
+      case .optIn(_, let fixedSource), .all(let fixedSource):
+        return fixedSource
+      }
+    }
+  }
+
+  /// Convenient version of `assertParse` that allows checking a single configuration of applied Fix-Its.
+  ///
+  /// - Parameters:
+  ///   - applyFixIts: Applies only the fix-its with these messages. Nil means applying all fix-its.
+  ///   - expectedFixedSource: Asserts that the source after applying fix-its matches
+  ///     this string.
+  func assertParse(
+    _ markedSource: String,
+    _ parse: @Sendable (inout Parser) -> some SyntaxProtocol = { SourceFileSyntax.parse(from: &$0) },
+    substructure expectedSubstructure: (some SyntaxProtocol)? = Optional<Syntax>.none,
+    substructureAfterMarker: String = "START",
+    diagnostics expectedDiagnostics: [DiagnosticSpec] = [],
+    applyFixIts: [String]? = nil,
+    fixedSource expectedFixedSource: String? = nil,
+    options: AssertParseOptions = [],
+    swiftVersion: Parser.SwiftVersion? = nil,
+    experimentalFeatures: Parser.ExperimentalFeatures? = nil,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    assertParse(
+      markedSource,
+      parse,
+      substructure: expectedSubstructure,
+      substructureAfterMarker: substructureAfterMarker,
+      diagnostics: expectedDiagnostics,
+      fixItsApplications: FixItsApplication(applyFixIts: applyFixIts, expectedFixedSource: expectedFixedSource).map {
+        [$0]
+      } ?? [],
+      options: options,
+      swiftVersion: swiftVersion,
+      experimentalFeatures: experimentalFeatures,
+      file: file,
+      line: line
+    )
+  }
+
   /// Verifies that parsing of `markedSource` produces expected results using a
   /// combination of various testing techniques:
   ///
@@ -518,7 +601,7 @@ extension ParserTestCase {
   ///    parsed tree is the same as the input.
   /// 2. Checks that parsing produces the expected list of diagnostics. If no
   ///    diagnostics are passed, asserts that the input parses without any errors.
-  /// 3. Checks that applying all Fix-Its of the source code results in the
+  /// 3. Checks that applying fix-its of the source code results in the
   ///    expected fixed source, effectively testing the Fix-Its.
   /// 4. If a substructure is passed, asserts that the parsed tree contains a
   ///    subtree of that structure.
@@ -545,22 +628,23 @@ extension ParserTestCase {
   ///   - expectedDiagnostics: Asserts the given diagnostics were output, by default it
   ///     asserts the parse was successful (ie. it has no diagnostics). Note
   ///     that `DiagnosticsSpec` uses the location marked by `1️⃣` by default.
-  ///   - applyFixIts: Applies only the fix-its with these messages.
-  ///   - expectedFixedSource: Asserts that the source after applying fix-its matches
-  ///     this string.
+  ///   - fixItsApplications: A list of `FixItsApplication` to check for whether applying certain fix-its to the source
+  ///     will generate a certain expected fixed source. An empty list means no fix-its are expected.
+  ///   - swiftVersion: The version of Swift using which the file should be parsed.
+  ///      Defaults to the latest version.
   ///   - experimentalFeatures: A list of experimental features to enable, or
   ///     `nil` to enable the default set of features provided by the test case.
-  func assertParse<S: SyntaxProtocol>(
+  func assertParse(
     _ markedSource: String,
-    _ parse: (inout Parser) -> S = { SourceFileSyntax.parse(from: &$0) },
+    _ parse: @Sendable (inout Parser) -> some SyntaxProtocol = { SourceFileSyntax.parse(from: &$0) },
     substructure expectedSubstructure: (some SyntaxProtocol)? = Optional<Syntax>.none,
     substructureAfterMarker: String = "START",
     diagnostics expectedDiagnostics: [DiagnosticSpec] = [],
-    applyFixIts: [String]? = nil,
-    fixedSource expectedFixedSource: String? = nil,
+    fixItsApplications: [FixItsApplication] = [],
     options: AssertParseOptions = [],
+    swiftVersion: Parser.SwiftVersion? = nil,
     experimentalFeatures: Parser.ExperimentalFeatures? = nil,
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
   ) {
     let experimentalFeatures = experimentalFeatures ?? self.experimentalFeatures
@@ -569,13 +653,13 @@ extension ParserTestCase {
     var (markerLocations, source) = extractMarkers(markedSource)
     markerLocations["START"] = 0
 
-    var parser = Parser(source, experimentalFeatures: experimentalFeatures)
+    var parser = Parser(source, swiftVersion: swiftVersion, experimentalFeatures: experimentalFeatures)
     #if SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION
     if !longTestsDisabled {
       parser.enableAlternativeTokenChoices()
     }
     #endif
-    let tree: S = parse(&parser)
+    let tree = parse(&parser)
 
     // Round-trip
     assertStringsEqualWithDiff(
@@ -624,49 +708,82 @@ extension ParserTestCase {
     }
 
     // Applying Fix-Its
-    if expectedDiagnostics.contains(where: { !$0.fixIts.isEmpty }) && expectedFixedSource == nil {
+    if expectedDiagnostics.contains(where: { !$0.fixIts.isEmpty }) && fixItsApplications.isEmpty {
       XCTFail("Expected a fixed source if the test case produces diagnostics with Fix-Its", file: file, line: line)
-    } else if let expectedFixedSource = expectedFixedSource {
-      let fixedTree = FixItApplier.applyFixes(from: diags, filterByMessages: applyFixIts, to: tree)
-      var fixedTreeDescription = fixedTree.description
-      if options.contains(.normalizeNewlinesInFixedSource) {
-        fixedTreeDescription =
-          fixedTreeDescription
-          .replacingOccurrences(of: "\r\n", with: "\n")
-          .replacingOccurrences(of: "\r", with: "\n")
+    } else {
+      for fixItsApplication in fixItsApplications {
+        let applyFixIts = fixItsApplication.applyFixIts
+        let fixedTree = FixItApplier.applyFixes(from: diags, filterByMessages: applyFixIts, to: tree)
+        var fixedTreeDescription = fixedTree.description
+        if options.contains(.normalizeNewlinesInFixedSource) {
+          fixedTreeDescription =
+            fixedTreeDescription
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        }
+        assertStringsEqualWithDiff(
+          fixedTreeDescription.trimmingTrailingWhitespace(),
+          fixItsApplication.expectedFixedSource.trimmingTrailingWhitespace(),
+          "Applying \(applyFixIts?.description ?? "all Fix-Its") didn’t produce the expected fixed source",
+          file: file,
+          line: line
+        )
       }
-      assertStringsEqualWithDiff(
-        fixedTreeDescription.trimmingTrailingWhitespace(),
-        expectedFixedSource.trimmingTrailingWhitespace(),
-        "Applying all Fix-Its didn’t produce the expected fixed source",
+    }
+
+    if expectedDiagnostics.allSatisfy({ $0.fixIts.isEmpty }) && !fixItsApplications.isEmpty {
+      XCTFail(
+        "Fixed source was provided but the test case produces no diagnostics with Fix-Its",
         file: file,
         line: line
       )
     }
 
-    if expectedDiagnostics.allSatisfy({ $0.fixIts.isEmpty }) && expectedFixedSource != nil {
-      XCTFail("Fixed source was provided but the test case produces no diagnostics with Fix-Its", file: file, line: line)
-    }
-
     if expectedDiagnostics.isEmpty && diags.isEmpty {
-      assertBasicFormat(source: source, parse: parse, experimentalFeatures: experimentalFeatures, file: file, line: line)
+      assertBasicFormat(
+        source: source,
+        parse: parse,
+        swiftVersion: swiftVersion,
+        experimentalFeatures: experimentalFeatures,
+        file: file,
+        line: line
+      )
     }
 
     if !longTestsDisabled {
       DispatchQueue.concurrentPerform(iterations: Array(tree.tokens(viewMode: .all)).count) { tokenIndex in
         let flippedTokenTree = TokenPresenceFlipper(flipTokenAtIndex: tokenIndex).rewrite(Syntax(tree))
         _ = ParseDiagnosticsGenerator.diagnostics(for: flippedTokenTree)
-        assertMutationRoundTrip(source: flippedTokenTree.syntaxTextBytes, parse, experimentalFeatures: experimentalFeatures, file: file, line: line)
+        Self.assertMutationRoundTrip(
+          source: flippedTokenTree.syntaxTextBytes,
+          parse,
+          swiftVersion: swiftVersion,
+          experimentalFeatures: experimentalFeatures,
+          file: file,
+          line: line
+        )
       }
 
       #if SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION
-      let mutations: [(offset: Int, replacement: TokenSpec)] = parser.alternativeTokenChoices.flatMap { offset, replacements in
+      let mutations: [(offset: Int, replacement: TokenSpec)] = parser.alternativeTokenChoices.flatMap {
+        offset,
+        replacements in
         return replacements.map { (offset, $0) }
       }
       DispatchQueue.concurrentPerform(iterations: mutations.count) { index in
         let mutation = mutations[index]
-        let alternateSource = MutatedTreePrinter.print(tree: Syntax(tree), mutations: [mutation.offset: mutation.replacement])
-        assertMutationRoundTrip(source: alternateSource, parse, experimentalFeatures: experimentalFeatures, file: file, line: line)
+        let alternateSource = MutatedTreePrinter.print(
+          tree: Syntax(tree),
+          mutations: [mutation.offset: mutation.replacement]
+        )
+        Self.assertMutationRoundTrip(
+          source: alternateSource,
+          parse,
+          swiftVersion: swiftVersion,
+          experimentalFeatures: experimentalFeatures,
+          file: file,
+          line: line
+        )
       }
       #endif
     }
@@ -701,19 +818,24 @@ class TriviaRemover: SyntaxRewriter {
   }
 }
 
-func assertBasicFormat<S: SyntaxProtocol>(
+func assertBasicFormat(
   source: String,
-  parse: (inout Parser) -> S,
+  parse: (inout Parser) -> some SyntaxProtocol,
+  swiftVersion: Parser.SwiftVersion?,
   experimentalFeatures: Parser.ExperimentalFeatures,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
-  var parser = Parser(source, experimentalFeatures: experimentalFeatures)
+  var parser = Parser(source, swiftVersion: swiftVersion, experimentalFeatures: experimentalFeatures)
   let sourceTree = parse(&parser)
   let withoutTrivia = TriviaRemover(viewMode: .sourceAccurate).rewrite(sourceTree)
   let formatted = withoutTrivia.formatted()
 
-  var formattedParser = Parser(formatted.description, experimentalFeatures: experimentalFeatures)
+  var formattedParser = Parser(
+    formatted.description,
+    swiftVersion: swiftVersion,
+    experimentalFeatures: experimentalFeatures
+  )
   let formattedReparsed = Syntax(parse(&formattedParser))
 
   do {

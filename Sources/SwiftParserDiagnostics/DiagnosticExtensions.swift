@@ -10,9 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftBasicFormat
+internal import SwiftDiagnostics
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 import SwiftBasicFormat
 import SwiftDiagnostics
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension FixIt {
   /// A more complex set of changes that affects multiple syntax nodes and thus
@@ -198,12 +204,8 @@ extension FixIt.MultiNodeChange {
       }
     }
 
-    if let previousToken = node.previousToken(viewMode: .fixedUp),
-      previousToken.isPresent,
-      let firstToken = node.firstToken(viewMode: .all),
-      previousToken.trailingTrivia.allSatisfy({ $0.isWhitespace }),
-      !BasicFormat().requiresWhitespace(between: previousToken, and: firstToken),
-      !BasicFormat().requiresNewline(between: previousToken, and: firstToken)
+    if node.shouldBeInsertedBeforePreviousTokenTrivia,
+      let previousToken = node.previousToken(viewMode: .fixedUp)
     {
       // If the previous token and this node don't need to be separated, remove
       // the separation.

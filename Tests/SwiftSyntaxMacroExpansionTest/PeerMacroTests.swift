@@ -37,7 +37,7 @@ final class PeerMacroTests: XCTestCase {
       // Only on functions at the moment. We could handle initializers as well
       // with a bit of work.
       guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
-        throw MacroExpansionErrorMessage("@addCompletionHandler only works on functions")
+        throw SwiftSyntaxMacros.MacroExpansionErrorMessage("@addCompletionHandler only works on functions")
       }
 
       // This only makes sense for async functions.
@@ -49,24 +49,17 @@ final class PeerMacroTests: XCTestCase {
           newEffects = FunctionEffectSpecifiersSyntax(asyncSpecifier: .keyword(.async))
         }
 
-        let newSignature = funcDecl.signature.with(\.effectSpecifiers, newEffects)
-
         let diag = Diagnostic(
           node: Syntax(funcDecl.funcKeyword),
-          message: MacroExpansionErrorMessage(
+          message: SwiftSyntaxMacros.MacroExpansionErrorMessage(
             "can only add a completion-handler variant to an 'async' function"
           ),
           fixIts: [
-            FixIt(
-              message: MacroExpansionFixItMessage(
-                "add 'async'"
-              ),
-              changes: [
-                FixIt.Change.replace(
-                  oldNode: Syntax(funcDecl.signature),
-                  newNode: Syntax(newSignature)
-                )
-              ]
+            .replaceChild(
+              message: SwiftSyntaxMacros.MacroExpansionFixItMessage("add 'async'"),
+              parent: funcDecl,
+              replacingChildAt: \FunctionDeclSyntax.signature.effectSpecifiers,
+              with: newEffects
             )
           ]
         )
@@ -90,7 +83,9 @@ final class PeerMacroTests: XCTestCase {
       var newParameterList = parameterList
       if !parameterList.isEmpty {
         // We need to add a trailing comma to the preceding list.
-        newParameterList[newParameterList.index(before: newParameterList.endIndex)].trailingComma = .commaToken(trailingTrivia: .space)
+        newParameterList[newParameterList.index(before: newParameterList.endIndex)].trailingComma = .commaToken(
+          trailingTrivia: .space
+        )
       }
       newParameterList.append(completionHandlerParam)
 

@@ -10,10 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftParser
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftParser
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
-// MARK: - ArrayElementList
+// MARK: - ArrayElementListSyntax
 
 extension ArrayElementListSyntax {
   public init(expressions: [ExprSyntax]) {
@@ -30,7 +35,7 @@ extension ArrayElementListSyntax {
   }
 }
 
-// MARK: - ArrayExpr
+// MARK: - ArrayExprSyntax
 
 extension ArrayExprSyntax {
   public init(expressions: [ExprSyntax]) {
@@ -38,7 +43,7 @@ extension ArrayExprSyntax {
   }
 }
 
-// MARK: - CustomAttribute
+// MARK: - AttributeSyntax
 
 extension AttributeSyntax {
   /// A convenience initializer that allows passing in arguments using a result builder
@@ -58,7 +63,7 @@ extension AttributeSyntax {
   }
 }
 
-// MARK: - BinaryOperatorExpr
+// MARK: - BinaryOperatorExprSyntax
 
 extension BinaryOperatorExprSyntax {
   public init(text: String) {
@@ -66,9 +71,9 @@ extension BinaryOperatorExprSyntax {
   }
 }
 
-// MARK: - BooleanLiteralExpr
+// MARK: - BooleanLiteralExprSyntax
 
-extension BooleanLiteralExprSyntax: ExpressibleByBooleanLiteral {
+extension BooleanLiteralExprSyntax {
   public init(_ value: Bool) {
     self.init(literal: value ? .keyword(.true) : .keyword(.false))
   }
@@ -77,8 +82,13 @@ extension BooleanLiteralExprSyntax: ExpressibleByBooleanLiteral {
     self.init(value)
   }
 }
+#if compiler(>=6)
+extension BooleanLiteralExprSyntax: Swift.ExpressibleByBooleanLiteral {}
+#else
+extension BooleanLiteralExprSyntax: ExpressibleByBooleanLiteral {}
+#endif
 
-// MARK: - CatchClause
+// MARK: - CatchClauseSyntax
 
 extension CatchClauseSyntax {
   /// A convenience initializer that calculates spacing around the `catch` keyword.
@@ -96,7 +106,7 @@ extension CatchClauseSyntax {
   }
 }
 
-// MARK: - DictionaryExpr
+// MARK: - DictionaryExprSyntax
 
 extension DictionaryExprSyntax {
   /// A convenience initializer that allows passing in members using a result builder
@@ -104,7 +114,9 @@ extension DictionaryExprSyntax {
   public init(
     leftSquare: TokenSyntax = .leftSquareToken(),
     rightSquare: TokenSyntax = .rightSquareToken(),
-    @DictionaryElementListBuilder contentBuilder: () -> DictionaryElementListSyntax = { DictionaryElementListSyntax([]) }
+    @DictionaryElementListBuilder contentBuilder: () -> DictionaryElementListSyntax = {
+      DictionaryElementListSyntax([])
+    }
   ) {
     let elementList = contentBuilder()
     self.init(
@@ -115,7 +127,15 @@ extension DictionaryExprSyntax {
   }
 }
 
-// MARK: - Expr
+// MARK: - ExprListSyntax
+
+extension ExprListSyntax {
+  public init(_ elements: [ExprSyntaxProtocol]) {
+    self.init(elements.map { ExprSyntax(fromProtocol: $0) } as [ExprSyntax])
+  }
+}
+
+// MARK: - ExprSyntax
 
 extension ExprSyntax {
   /// Returns a syntax tree for an expression that represents the value of the
@@ -153,7 +173,7 @@ extension ExprSyntax {
 
 // MARK: - FloatLiteralExprSyntax
 
-extension FloatLiteralExprSyntax: ExpressibleByFloatLiteral {
+extension FloatLiteralExprSyntax {
   public init(_ value: Float) {
     self.init(literal: .floatLiteral(String(value)))
   }
@@ -163,7 +183,13 @@ extension FloatLiteralExprSyntax: ExpressibleByFloatLiteral {
   }
 }
 
-// MARK: - FunctionCallExpr
+#if compiler(>=6)
+extension FloatLiteralExprSyntax: Swift.ExpressibleByFloatLiteral {}
+#else
+extension FloatLiteralExprSyntax: ExpressibleByFloatLiteral {}
+#endif
+
+// MARK: - FunctionCallExprSyntax
 
 extension FunctionCallExprSyntax {
   /// A convenience initializer that allows passing in arguments using a result builder
@@ -188,9 +214,9 @@ extension FunctionCallExprSyntax {
   }
 }
 
-// MARK: - IntegerLiteralExpr
+// MARK: - IntegerLiteralExprSyntax
 
-extension IntegerLiteralExprSyntax: ExpressibleByIntegerLiteral {
+extension IntegerLiteralExprSyntax {
   public init(_ value: Int) {
     self.init(literal: .integerLiteral(String(value)))
   }
@@ -200,7 +226,27 @@ extension IntegerLiteralExprSyntax: ExpressibleByIntegerLiteral {
   }
 }
 
-// MARK: - StringLiteralExpr
+#if compiler(>=6)
+extension IntegerLiteralExprSyntax: Swift.ExpressibleByIntegerLiteral {}
+#else
+extension IntegerLiteralExprSyntax: ExpressibleByIntegerLiteral {}
+#endif
+
+// MARK: - LabeledExprSyntax
+
+extension LabeledExprSyntax {
+  /// A convenience initializer that allows passing in label as an optional string.
+  /// The presence of the colon will be inferred based on the presence of the label.
+  public init(label: String? = nil, expression: some ExprSyntaxProtocol) {
+    self.init(
+      label: label.map { .identifier($0) },
+      colon: label == nil ? nil : .colonToken(trailingTrivia: .space),
+      expression: expression
+    )
+  }
+}
+
+// MARK: - StringLiteralExprSyntax
 
 extension String {
   /// Replace literal newlines with "\r", "\n", "\u{2028}", and ASCII control characters with "\0", "\u{7}"
@@ -338,21 +384,15 @@ extension StringLiteralExprSyntax {
   }
 }
 
-// MARK: - TupleExprElement
+// MARK: - UnexpectedNodesSyntax
 
-extension LabeledExprSyntax {
-  /// A convenience initializer that allows passing in label as an optional string.
-  /// The presence of the colon will be inferred based on the presence of the label.
-  public init(label: String? = nil, expression: some ExprSyntaxProtocol) {
-    self.init(
-      label: label.map { .identifier($0) },
-      colon: label == nil ? nil : .colonToken(trailingTrivia: .space),
-      expression: expression
-    )
+extension UnexpectedNodesSyntax {
+  public init(_ elements: [SyntaxProtocol]) {
+    self.init(elements.map { Syntax(fromProtocol: $0) } as [Syntax])
   }
 }
 
-// MARK: - VariableDecl
+// MARK: - VariableDeclSyntax
 
 extension VariableDeclSyntax {
   /// Creates an optionally initialized property.
@@ -363,7 +403,8 @@ extension VariableDeclSyntax {
     _ bindingSpecifier: Keyword,
     name: PatternSyntax,
     type: TypeAnnotationSyntax? = nil,
-    initializer: InitializerClauseSyntax? = nil
+    initializer: InitializerClauseSyntax? = nil,
+    accessorBlock: AccessorBlockSyntax? = nil
   ) {
     self.init(
       leadingTrivia: leadingTrivia,
@@ -374,7 +415,8 @@ extension VariableDeclSyntax {
       PatternBindingSyntax(
         pattern: name,
         typeAnnotation: type,
-        initializer: initializer
+        initializer: initializer,
+        accessorBlock: accessorBlock
       )
     }
   }

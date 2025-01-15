@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public enum Keyword: UInt8, Hashable {
+public enum Keyword: UInt8, Hashable, Sendable {
   case __consuming
   case __owned
   case __setter_access
@@ -20,14 +20,15 @@ public enum Keyword: UInt8, Hashable {
   case _alignment
   case _backDeploy
   case _borrow
-  @_spi(ExperimentalLanguageFeatures)
   case _borrowing
   case _BridgeObject
   case _cdecl
   case _Class
   case _compilerInitialized
   case _const
+  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
+  #endif
   case _consuming
   case _documentation
   case _dynamicReplacement
@@ -39,7 +40,9 @@ public enum Keyword: UInt8, Hashable {
   case _local
   case _modify
   case _move
+  #if compiler(>=5.8)
   @_spi(ExperimentalLanguageFeatures)
+  #endif
   case _mutating
   case _NativeClass
   case _NativeRefCountedObject
@@ -68,6 +71,10 @@ public enum Keyword: UInt8, Hashable {
   case _underlyingVersion
   case _UnknownLayout
   case _version
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case abi
   case accesses
   case actor
   case addressWithNativeOwner
@@ -87,6 +94,7 @@ public enum Keyword: UInt8, Hashable {
   case backDeployed
   case before
   case block
+  case borrow
   case borrowing
   case `break`
   case canImport
@@ -104,6 +112,10 @@ public enum Keyword: UInt8, Hashable {
   case `default`
   case `defer`
   case `deinit`
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case dependsOn
   case deprecated
   case derivative
   case didSet
@@ -127,6 +139,7 @@ public enum Keyword: UInt8, Hashable {
   case discard
   case forward
   case `func`
+  case freestanding
   case get
   case `guard`
   case higherThan
@@ -153,6 +166,10 @@ public enum Keyword: UInt8, Hashable {
   case macro
   case message
   case metadata
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case modify
   case module
   case mutableAddressWithNativeOwner
   case mutableAddressWithOwner
@@ -174,26 +191,32 @@ public enum Keyword: UInt8, Hashable {
   case package
   case postfix
   case `precedencegroup`
+  case preconcurrency
   case prefix
   case `private`
   case `Protocol`
   case `protocol`
   case `public`
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case read
   case reasync
   case renamed
   case `repeat`
   case required
-  @_spi(ExperimentalLanguageFeatures)
-  case _resultDependsOn
-  @_spi(ExperimentalLanguageFeatures)
-  case _resultDependsOnSelf
   case `rethrows`
   case retroactive
   case `return`
   case reverse
   case right
   case safe
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case scoped
   case `self`
+  case sending
   case `Self`
   case Sendable
   case set
@@ -231,7 +254,7 @@ public enum Keyword: UInt8, Hashable {
   case witness_method
   case wrt
   case yield
-  
+
   @_spi(RawSyntax) public init?(_ text: SyntaxText) {
     switch text.count {
     case 2:
@@ -253,6 +276,8 @@ public enum Keyword: UInt8, Hashable {
       }
     case 3:
       switch text {
+      case "abi":
+        self = .abi
       case "any":
         self = .any
       case "Any":
@@ -312,6 +337,8 @@ public enum Keyword: UInt8, Hashable {
         self = .objc
       case "open":
         self = .open
+      case "read":
+        self = .read
       case "safe":
         self = .safe
       case "self":
@@ -396,6 +423,8 @@ public enum Keyword: UInt8, Hashable {
         self = ._local
       case "before":
         self = .before
+      case "borrow":
+        self = .borrow
       case "deinit":
         self = .deinit
       case "didSet":
@@ -406,6 +435,8 @@ public enum Keyword: UInt8, Hashable {
         self = .inline
       case "linear":
         self = .linear
+      case "modify":
+        self = .modify
       case "module":
         self = .module
       case "prefix":
@@ -416,6 +447,8 @@ public enum Keyword: UInt8, Hashable {
         self = .repeat
       case "return":
         self = .return
+      case "scoped":
+        self = .scoped
       case "static":
         self = .static
       case "struct":
@@ -469,6 +502,8 @@ public enum Keyword: UInt8, Hashable {
         self = .renamed
       case "reverse":
         self = .reverse
+      case "sending":
+        self = .sending
       case "unowned":
         self = .unowned
       case "willSet":
@@ -547,6 +582,8 @@ public enum Keyword: UInt8, Hashable {
         self = .canImport
       case "consuming":
         self = .consuming
+      case "dependsOn":
+        self = .dependsOn
       case "extension":
         self = .extension
       case "lowerThan":
@@ -644,6 +681,8 @@ public enum Keyword: UInt8, Hashable {
         self = .availability
       case "backDeployed":
         self = .backDeployed
+      case "freestanding":
+        self = .freestanding
       case "noDerivative":
         self = .noDerivative
       default:
@@ -676,6 +715,8 @@ public enum Keyword: UInt8, Hashable {
         self = .associatedtype
       case "differentiable":
         self = .differentiable
+      case "preconcurrency":
+        self = .preconcurrency
       case "witness_method":
         self = .witness_method
       default:
@@ -696,8 +737,6 @@ public enum Keyword: UInt8, Hashable {
         self = ._objcRuntimeName
       case "addressWithOwner":
         self = .addressWithOwner
-      case "_resultDependsOn":
-        self = ._resultDependsOn
       default:
         return nil
       }
@@ -734,8 +773,6 @@ public enum Keyword: UInt8, Hashable {
         self = ._compilerInitialized
       case "_originallyDefinedIn":
         self = ._originallyDefinedIn
-      case "_resultDependsOnSelf":
-        self = ._resultDependsOnSelf
       case "unsafeMutableAddress":
         self = .unsafeMutableAddress
       default:
@@ -784,228 +821,235 @@ public enum Keyword: UInt8, Hashable {
       return nil
     }
   }
-  
+
   /// This is really unfortunate. Really, we should have a `switch` in
   /// `Keyword.defaultText` to return the keyword's kind but the constant lookup
   /// table is significantly faster. Ideally, we could also get the compiler to
   /// constant-evaluate `Keyword.spi.defaultText` to a ``SyntaxText`` but I don't
   /// see how that's possible right now.
   private static let keywordTextLookupTable: [SyntaxText] = [
-      "__consuming", 
-      "__owned", 
-      "__setter_access", 
-      "__shared", 
-      "_alignment", 
-      "_backDeploy", 
-      "_borrow", 
-      "_borrowing", 
-      "_BridgeObject", 
-      "_cdecl", 
-      "_Class", 
-      "_compilerInitialized", 
-      "_const", 
-      "_consuming", 
-      "_documentation", 
-      "_dynamicReplacement", 
-      "_effects", 
-      "_expose", 
-      "_forward", 
-      "_implements", 
-      "_linear", 
-      "_local", 
-      "_modify", 
-      "_move", 
-      "_mutating", 
-      "_NativeClass", 
-      "_NativeRefCountedObject", 
-      "_noMetadata", 
-      "_nonSendable", 
-      "_objcImplementation", 
-      "_objcRuntimeName", 
-      "_opaqueReturnTypeOf", 
-      "_optimize", 
-      "_originallyDefinedIn", 
-      "_PackageDescription", 
-      "_private", 
-      "_projectedValueProperty", 
-      "_read", 
-      "_RefCountedObject", 
-      "_semantics", 
-      "_specialize", 
-      "_spi", 
-      "_spi_available", 
-      "_swift_native_objc_runtime_base", 
-      "_Trivial", 
-      "_TrivialAtMost", 
-      "_TrivialStride", 
-      "_typeEraser", 
-      "_unavailableFromAsync", 
-      "_underlyingVersion", 
-      "_UnknownLayout", 
-      "_version", 
-      "accesses", 
-      "actor", 
-      "addressWithNativeOwner", 
-      "addressWithOwner", 
-      "any", 
-      "Any", 
-      "as", 
-      "assignment", 
-      "associatedtype", 
-      "associativity", 
-      "async", 
-      "attached", 
-      "autoclosure", 
-      "availability", 
-      "available", 
-      "await", 
-      "backDeployed", 
-      "before", 
-      "block", 
-      "borrowing", 
-      "break", 
-      "canImport", 
-      "case", 
-      "catch", 
-      "class", 
-      "compiler", 
-      "consume", 
-      "copy", 
-      "consuming", 
-      "continue", 
-      "convenience", 
-      "convention", 
-      "cType", 
-      "default", 
-      "defer", 
-      "deinit", 
-      "deprecated", 
-      "derivative", 
-      "didSet", 
-      "differentiable", 
-      "distributed", 
-      "do", 
-      "dynamic", 
-      "each", 
-      "else", 
-      "enum", 
-      "escaping", 
-      "exclusivity", 
-      "exported", 
-      "extension", 
-      "fallthrough", 
-      "false", 
-      "file", 
-      "fileprivate", 
-      "final", 
-      "for", 
-      "discard", 
-      "forward", 
-      "func", 
-      "get", 
-      "guard", 
-      "higherThan", 
-      "if", 
-      "import", 
-      "in", 
-      "indirect", 
-      "infix", 
-      "init", 
-      "initializes", 
-      "inline", 
-      "inout", 
-      "internal", 
-      "introduced", 
-      "is", 
-      "isolated", 
-      "kind", 
-      "lazy", 
-      "left", 
-      "let", 
-      "line", 
-      "linear", 
-      "lowerThan", 
-      "macro", 
-      "message", 
-      "metadata", 
-      "module", 
-      "mutableAddressWithNativeOwner", 
-      "mutableAddressWithOwner", 
-      "mutating", 
-      "nil", 
-      "noasync", 
-      "noDerivative", 
-      "noescape", 
-      "none", 
-      "nonisolated", 
-      "nonmutating", 
-      "objc", 
-      "obsoleted", 
-      "of", 
-      "open", 
-      "operator", 
-      "optional", 
-      "override", 
-      "package", 
-      "postfix", 
-      "precedencegroup", 
-      "prefix", 
-      "private", 
-      "Protocol", 
-      "protocol", 
-      "public", 
-      "reasync", 
-      "renamed", 
-      "repeat", 
-      "required", 
-      "_resultDependsOn", 
-      "_resultDependsOnSelf", 
-      "rethrows", 
-      "retroactive", 
-      "return", 
-      "reverse", 
-      "right", 
-      "safe", 
-      "self", 
-      "Self", 
-      "Sendable", 
-      "set", 
-      "some", 
-      "sourceFile", 
-      "spi", 
-      "spiModule", 
-      "static", 
-      "struct", 
-      "subscript", 
-      "super", 
-      "swift", 
-      "switch", 
-      "target", 
-      "then", 
-      "throw", 
-      "throws", 
-      "transpose", 
-      "true", 
-      "try", 
-      "Type", 
-      "typealias", 
-      "unavailable", 
-      "unchecked", 
-      "unowned", 
-      "unsafe", 
-      "unsafeAddress", 
-      "unsafeMutableAddress", 
-      "var", 
-      "visibility", 
-      "weak", 
-      "where", 
-      "while", 
-      "willSet", 
-      "witness_method", 
-      "wrt", 
-      "yield",
-    ]
-  
+    "__consuming",
+    "__owned",
+    "__setter_access",
+    "__shared",
+    "_alignment",
+    "_backDeploy",
+    "_borrow",
+    "_borrowing",
+    "_BridgeObject",
+    "_cdecl",
+    "_Class",
+    "_compilerInitialized",
+    "_const",
+    "_consuming",
+    "_documentation",
+    "_dynamicReplacement",
+    "_effects",
+    "_expose",
+    "_forward",
+    "_implements",
+    "_linear",
+    "_local",
+    "_modify",
+    "_move",
+    "_mutating",
+    "_NativeClass",
+    "_NativeRefCountedObject",
+    "_noMetadata",
+    "_nonSendable",
+    "_objcImplementation",
+    "_objcRuntimeName",
+    "_opaqueReturnTypeOf",
+    "_optimize",
+    "_originallyDefinedIn",
+    "_PackageDescription",
+    "_private",
+    "_projectedValueProperty",
+    "_read",
+    "_RefCountedObject",
+    "_semantics",
+    "_specialize",
+    "_spi",
+    "_spi_available",
+    "_swift_native_objc_runtime_base",
+    "_Trivial",
+    "_TrivialAtMost",
+    "_TrivialStride",
+    "_typeEraser",
+    "_unavailableFromAsync",
+    "_underlyingVersion",
+    "_UnknownLayout",
+    "_version",
+    "abi",
+    "accesses",
+    "actor",
+    "addressWithNativeOwner",
+    "addressWithOwner",
+    "any",
+    "Any",
+    "as",
+    "assignment",
+    "associatedtype",
+    "associativity",
+    "async",
+    "attached",
+    "autoclosure",
+    "availability",
+    "available",
+    "await",
+    "backDeployed",
+    "before",
+    "block",
+    "borrow",
+    "borrowing",
+    "break",
+    "canImport",
+    "case",
+    "catch",
+    "class",
+    "compiler",
+    "consume",
+    "copy",
+    "consuming",
+    "continue",
+    "convenience",
+    "convention",
+    "cType",
+    "default",
+    "defer",
+    "deinit",
+    "dependsOn",
+    "deprecated",
+    "derivative",
+    "didSet",
+    "differentiable",
+    "distributed",
+    "do",
+    "dynamic",
+    "each",
+    "else",
+    "enum",
+    "escaping",
+    "exclusivity",
+    "exported",
+    "extension",
+    "fallthrough",
+    "false",
+    "file",
+    "fileprivate",
+    "final",
+    "for",
+    "discard",
+    "forward",
+    "func",
+    "freestanding",
+    "get",
+    "guard",
+    "higherThan",
+    "if",
+    "import",
+    "in",
+    "indirect",
+    "infix",
+    "init",
+    "initializes",
+    "inline",
+    "inout",
+    "internal",
+    "introduced",
+    "is",
+    "isolated",
+    "kind",
+    "lazy",
+    "left",
+    "let",
+    "line",
+    "linear",
+    "lowerThan",
+    "macro",
+    "message",
+    "metadata",
+    "modify",
+    "module",
+    "mutableAddressWithNativeOwner",
+    "mutableAddressWithOwner",
+    "mutating",
+    "nil",
+    "noasync",
+    "noDerivative",
+    "noescape",
+    "none",
+    "nonisolated",
+    "nonmutating",
+    "objc",
+    "obsoleted",
+    "of",
+    "open",
+    "operator",
+    "optional",
+    "override",
+    "package",
+    "postfix",
+    "precedencegroup",
+    "preconcurrency",
+    "prefix",
+    "private",
+    "Protocol",
+    "protocol",
+    "public",
+    "read",
+    "reasync",
+    "renamed",
+    "repeat",
+    "required",
+    "rethrows",
+    "retroactive",
+    "return",
+    "reverse",
+    "right",
+    "safe",
+    "scoped",
+    "self",
+    "sending",
+    "Self",
+    "Sendable",
+    "set",
+    "some",
+    "sourceFile",
+    "spi",
+    "spiModule",
+    "static",
+    "struct",
+    "subscript",
+    "super",
+    "swift",
+    "switch",
+    "target",
+    "then",
+    "throw",
+    "throws",
+    "transpose",
+    "true",
+    "try",
+    "Type",
+    "typealias",
+    "unavailable",
+    "unchecked",
+    "unowned",
+    "unsafe",
+    "unsafeAddress",
+    "unsafeMutableAddress",
+    "var",
+    "visibility",
+    "weak",
+    "where",
+    "while",
+    "willSet",
+    "witness_method",
+    "wrt",
+    "yield",
+  ]
+
   @_spi(RawSyntax)
   public var defaultText: SyntaxText {
     return Keyword.keywordTextLookupTable[Int(self.rawValue)]

@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) @_spi(BumpPtrAllocator) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) import SwiftSyntax
+#endif
 
 /// A separate lexer specifically for regex literals.
 fileprivate struct RegexLiteralLexer {
@@ -203,9 +207,6 @@ fileprivate struct RegexLiteralLexer {
         lastUnespacedSpaceOrTab.position.advanced(by: 1).pointer == slashBegin.position.pointer
       {
         if mustBeRegex {
-          // TODO: We ought to have a fix-it that suggests #/.../#. We could
-          // suggest escaping, but that would be wrong if the user has written (?x).
-          // TODO: Should we suggest #/.../# for space-as-first character too?
           builder.recordPatternError(.spaceAtEndOfRegexLiteral, at: lastUnespacedSpaceOrTab)
         } else {
           return .notARegex
@@ -252,7 +253,6 @@ fileprivate struct RegexLiteralLexer {
           // }
           //
           if mustBeRegex {
-            // TODO: We ought to have a fix-it that inserts a backslash to escape.
             builder.recordPatternError(.spaceAtStartOfRegexLiteral, at: cursor)
           } else {
             return .notARegex
@@ -656,7 +656,8 @@ extension Lexer.Cursor {
       return true
 
     // Bits of string/regex grammar, we can't start lexing a regex literal here.
-    case .regexPoundDelimiter, .regexSlash, .regexLiteralPattern, .rawStringPoundDelimiter, .stringQuote, .stringSegment, .multilineStringQuote, .singleQuote:
+    case .regexPoundDelimiter, .regexSlash, .regexLiteralPattern, .rawStringPoundDelimiter, .stringQuote,
+      .stringSegment, .multilineStringQuote, .singleQuote:
       return false
 
     // Allow unknown for better recovery.

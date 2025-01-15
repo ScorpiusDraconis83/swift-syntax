@@ -23,7 +23,7 @@ extension ParserTestCase {
     diagnostics expectedDiagnostics: [DiagnosticSpec] = [],
     applyFixIts: [String]? = nil,
     fixedSource expectedFixedSource: String? = nil,
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
   ) {
     for newline in ["\n", "\r", "\r\n"] {
@@ -320,7 +320,10 @@ final class MultilineErrorsTests: ParserTestCase {
           """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal content must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal content must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -339,7 +342,10 @@ final class MultilineErrorsTests: ParserTestCase {
           Pi1️⃣"""
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal closing delimiter must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal closing delimiter must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -356,7 +362,10 @@ final class MultilineErrorsTests: ParserTestCase {
       _ = """1️⃣"""
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal closing delimiter must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal closing delimiter must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -371,7 +380,10 @@ final class MultilineErrorsTests: ParserTestCase {
       _ = """ 1️⃣"""
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal closing delimiter must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal closing delimiter must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -620,7 +632,10 @@ final class MultilineErrorsTests: ParserTestCase {
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove '\'"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -639,7 +654,10 @@ final class MultilineErrorsTests: ParserTestCase {
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -657,7 +675,10 @@ final class MultilineErrorsTests: ParserTestCase {
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -675,7 +696,10 @@ final class MultilineErrorsTests: ParserTestCase {
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -686,24 +710,6 @@ final class MultilineErrorsTests: ParserTestCase {
   }
 
   func testMultilineErrors25() {
-    assertParseWithAllNewlineEndings(
-      #"""
-      _ = """
-        foo1️⃣\
-        """
-      """#,
-      diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
-      ],
-      fixedSource: #"""
-        _ = """
-          foo
-          """
-        """#
-    )
-  }
-
-  func testMultilineErrors26() {
     assertParseWithAllNewlineEndings(
       ##"""
       _ = ℹ️"""
@@ -729,7 +735,7 @@ final class MultilineErrorsTests: ParserTestCase {
     )
   }
 
-  func testMultilineErrors28() {
+  func testMultilineErrors26() {
     assertParseWithAllNewlineEndings(
       #"""
       _ = """
@@ -737,7 +743,10 @@ final class MultilineErrorsTests: ParserTestCase {
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"])
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -747,15 +756,21 @@ final class MultilineErrorsTests: ParserTestCase {
     )
   }
 
-  func testMultilineErrors29() {
+  func testMultilineErrors27() {
     assertParseWithAllNewlineEndings(
       #"""
       _ = """1️⃣\
         """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal content must begin on a new line", fixIts: ["insert newline"]),
-        DiagnosticSpec(message: "escaped newline at the last line of a multi-line string literal is not allowed", fixIts: ["remove ''"]),
+        DiagnosticSpec(
+          message: "multi-line string literal content must begin on a new line",
+          fixIts: ["insert newline"]
+        ),
+        DiagnosticSpec(
+          message: "escaped newline at the last line of a multi-line string literal is not allowed",
+          fixIts: [#"remove '\'"#]
+        ),
       ],
       fixedSource: #"""
         _ = """
@@ -766,7 +781,7 @@ final class MultilineErrorsTests: ParserTestCase {
     )
   }
 
-  func testMultilineErrors30() {
+  func testMultilineErrors28() {
     assertParseWithAllNewlineEndings(
       ##"""
       let _ = """
@@ -803,7 +818,7 @@ final class MultilineErrorsTests: ParserTestCase {
     )
   }
 
-  func testMultilineErrors31() {
+  func testMultilineErrors29() {
     assertParseWithAllNewlineEndings(
       ##"""
       let _ = """
@@ -850,7 +865,10 @@ final class MultilineErrorsTests: ParserTestCase {
       \(1)1️⃣"""
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal closing delimiter must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal closing delimiter must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         _ = """
@@ -960,7 +978,10 @@ final class MultilineErrorsTests: ParserTestCase {
       """
       """#,
       diagnostics: [
-        DiagnosticSpec(message: "multi-line string literal content must begin on a new line", fixIts: ["insert newline"])
+        DiagnosticSpec(
+          message: "multi-line string literal content must begin on a new line",
+          fixIts: ["insert newline"]
+        )
       ],
       fixedSource: #"""
         """

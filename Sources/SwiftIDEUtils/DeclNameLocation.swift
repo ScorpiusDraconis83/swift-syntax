@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// The location of a declaration name, resolved by ``NameMatcher`` and that can
 /// be used to rename the declaration name and, if it is a function, its
@@ -98,6 +102,12 @@ public struct DeclNameLocation: Equatable {
     /// The parameter of a function declaration, like `func foo(a b: Int)`
     case parameters([Argument])
 
+    /// An enum case declaration like `case myCase(label: String)`.
+    ///
+    /// For enum case parameters the argument label is removed when set to empty instead of being changed to eg.
+    /// `myCase(_ label: String)`
+    case enumCaseParameters([Argument])
+
     /// Same as `param` but the parameters can't be collapsed if they are the same. This is the case for subscript
     /// declarations.
     ///
@@ -113,9 +123,14 @@ public struct DeclNameLocation: Equatable {
       case .noArguments:
         return .noArguments
       case .call(let arguments, firstTrailingClosureIndex: let firstTrailingClosureIndex):
-        return .call(arguments.map { $0.advanced(by: utf8Offset) }, firstTrailingClosureIndex: firstTrailingClosureIndex)
+        return .call(
+          arguments.map { $0.advanced(by: utf8Offset) },
+          firstTrailingClosureIndex: firstTrailingClosureIndex
+        )
       case .parameters(let parameters):
         return .parameters(parameters.map { $0.advanced(by: utf8Offset) })
+      case .enumCaseParameters(let parameters):
+        return .enumCaseParameters(parameters.map { $0.advanced(by: utf8Offset) })
       case .noncollapsibleParameters(let parameters):
         return .noncollapsibleParameters(parameters.map { $0.advanced(by: utf8Offset) })
       case .selector(let arguments):

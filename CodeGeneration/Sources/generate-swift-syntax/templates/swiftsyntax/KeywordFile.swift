@@ -24,14 +24,14 @@ let lookupTable = ArrayExprSyntax(leftSquare: .leftSquareToken(trailingTrivia: .
 let keywordFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
   try! EnumDeclSyntax(
     """
-    public enum Keyword: UInt8, Hashable
+    public enum Keyword: UInt8, Hashable, Sendable
     """
   ) {
     for keyword in Keyword.allCases {
       DeclSyntax(
         """
         \(keyword.spec.apiAttributes)\
-        case \(keyword.spec.varOrCaseName.backtickedIfNeeded)
+        case \(keyword.spec.enumCaseDeclName)
         """
       )
     }
@@ -43,7 +43,7 @@ let keywordFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
             try! SwitchExprSyntax("switch text") {
               for keyword in keywords {
                 SwitchCaseSyntax("case \(literal: keyword.name):") {
-                  ExprSyntax("self = .\(keyword.varOrCaseName)")
+                  ExprSyntax("self = .\(keyword.enumCaseCallName)")
                 }
               }
               SwitchCaseSyntax("default: return nil")

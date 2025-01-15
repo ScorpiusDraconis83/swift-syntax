@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Format a string literal by inserting or removing the appropriate number of
 /// raw string `#` delimiters.
@@ -43,6 +47,10 @@ public struct FormatRawStringLiteral: SyntaxRefactoringProvider {
       case .stringSegment(let string):
         // Find the longest run of # characters in the content of the literal.
         maximumHashes = max(maximumHashes, string.content.text.longestRun(of: "#"))
+      #if RESILIENT_LIBRARIES
+      @unknown default:
+        fatalError()
+      #endif
       }
     }
 

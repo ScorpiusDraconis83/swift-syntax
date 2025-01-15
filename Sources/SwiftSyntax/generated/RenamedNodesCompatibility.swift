@@ -45,6 +45,12 @@ public typealias AvailabilityVersionRestrictionListEntrySyntax = PlatformVersion
 @available(*, deprecated, renamed: "BackDeployedAttributeArgumentsSyntax")
 public typealias BackDeployedAttributeSpecListSyntax = BackDeployedAttributeArgumentsSyntax
 
+@available(*, deprecated, message: "'canImport' directives are now represented as a `FunctionCallExpr`")
+public typealias CanImportExprSyntax = _CanImportExprSyntax
+
+@available(*, deprecated, message: "'canImport' directives are now represented as a `FunctionCallExpr`")
+public typealias CanImportVersionInfoSyntax = _CanImportVersionInfoSyntax
+
 @available(*, deprecated, renamed: "SwitchCaseItemSyntax")
 public typealias CaseItemSyntax = SwitchCaseItemSyntax
 
@@ -192,6 +198,9 @@ public typealias TupleExprElementListSyntax = LabeledExprListSyntax
 @available(*, deprecated, renamed: "InheritanceClauseSyntax")
 public typealias TypeInheritanceClauseSyntax = InheritanceClauseSyntax
 
+@available(*, deprecated, renamed: "SimpleTypeSpecifierSyntax")
+public typealias TypeSpecifierSyntax = SimpleTypeSpecifierSyntax
+
 @available(*, deprecated, renamed: "TypeAliasDeclSyntax")
 public typealias TypealiasDeclSyntax = TypeAliasDeclSyntax
 
@@ -210,268 +219,349 @@ public typealias YieldExprListElementSyntax = YieldedExpressionSyntax
 @available(*, deprecated, renamed: "YieldedExpressionsClauseSyntax")
 public typealias YieldListSyntax = YieldedExpressionsClauseSyntax
 
-public extension SyntaxKind {
-  static var accessPath: Self {
+extension SyntaxKind {
+  @available(*, deprecated, renamed: "ImportPathComponentListSyntax")
+  public static var accessPath: Self {
     return .importPathComponentList
   }
-  
-  static var accessPathComponent: Self {
+
+  @available(*, deprecated, renamed: "ImportPathComponentSyntax")
+  public static var accessPathComponent: Self {
     return .importPathComponent
   }
-  
-  static var accessorList: Self {
+
+  @available(*, deprecated, renamed: "AccessorDeclListSyntax")
+  public static var accessorList: Self {
     return .accessorDeclList
   }
-  
-  static var accessorParameter: Self {
+
+  @available(*, deprecated, renamed: "AccessorParametersSyntax")
+  public static var accessorParameter: Self {
     return .accessorParameters
   }
-  
-  static var associatedtypeDecl: Self {
+
+  @available(*, deprecated, renamed: "AssociatedTypeDeclSyntax")
+  public static var associatedtypeDecl: Self {
     return .associatedTypeDecl
   }
-  
-  static var availabilityEntry: Self {
+
+  @available(*, deprecated, renamed: "SpecializeAvailabilityArgumentSyntax")
+  public static var availabilityEntry: Self {
     return .specializeAvailabilityArgument
   }
-  
-  static var availabilitySpecList: Self {
+
+  @available(*, deprecated, renamed: "AvailabilityArgumentListSyntax")
+  public static var availabilitySpecList: Self {
     return .availabilityArgumentList
   }
-  
-  static var availabilityVersionRestriction: Self {
+
+  @available(*, deprecated, renamed: "PlatformVersionSyntax")
+  public static var availabilityVersionRestriction: Self {
     return .platformVersion
   }
-  
-  static var availabilityVersionRestrictionList: Self {
+
+  @available(*, deprecated, renamed: "PlatformVersionItemListSyntax")
+  public static var availabilityVersionRestrictionList: Self {
     return .platformVersionItemList
   }
-  
-  static var availabilityVersionRestrictionListEntry: Self {
+
+  @available(*, deprecated, renamed: "PlatformVersionItemSyntax")
+  public static var availabilityVersionRestrictionListEntry: Self {
     return .platformVersionItem
   }
-  
-  static var backDeployedAttributeSpecList: Self {
+
+  @available(*, deprecated, renamed: "BackDeployedAttributeArgumentsSyntax")
+  public static var backDeployedAttributeSpecList: Self {
     return .backDeployedAttributeArguments
   }
-  
-  static var caseItem: Self {
+
+  @available(*, deprecated, message: "'canImport' directives are now represented as a `FunctionCallExpr`")
+  public static var canImportExpr: Self {
+    return ._canImportExpr
+  }
+
+  @available(*, deprecated, message: "'canImport' directives are now represented as a `FunctionCallExpr`")
+  public static var canImportVersionInfo: Self {
+    return ._canImportVersionInfo
+  }
+
+  @available(*, deprecated, renamed: "SwitchCaseItemSyntax")
+  public static var caseItem: Self {
     return .switchCaseItem
   }
-  
-  static var caseItemList: Self {
+
+  @available(*, deprecated, renamed: "SwitchCaseItemListSyntax")
+  public static var caseItemList: Self {
     return .switchCaseItemList
   }
-  
-  static var closureCaptureItem: Self {
+
+  @available(*, deprecated, renamed: "ClosureCaptureSyntax")
+  public static var closureCaptureItem: Self {
     return .closureCapture
   }
-  
-  static var closureCaptureItemList: Self {
+
+  @available(*, deprecated, renamed: "ClosureCaptureListSyntax")
+  public static var closureCaptureItemList: Self {
     return .closureCaptureList
   }
-  
-  static var closureCaptureItemSpecifier: Self {
+
+  @available(*, deprecated, renamed: "ClosureCaptureSpecifierSyntax")
+  public static var closureCaptureItemSpecifier: Self {
     return .closureCaptureSpecifier
   }
-  
-  static var closureCaptureSignature: Self {
+
+  @available(*, deprecated, renamed: "ClosureCaptureClauseSyntax")
+  public static var closureCaptureSignature: Self {
     return .closureCaptureClause
   }
-  
-  static var closureParam: Self {
+
+  @available(*, deprecated, renamed: "ClosureShorthandParameterSyntax")
+  public static var closureParam: Self {
     return .closureShorthandParameter
   }
-  
-  static var closureParamList: Self {
+
+  @available(*, deprecated, renamed: "ClosureShorthandParameterListSyntax")
+  public static var closureParamList: Self {
     return .closureShorthandParameterList
   }
-  
-  static var constrainedSugarType: Self {
+
+  @available(*, deprecated, renamed: "SomeOrAnyTypeSyntax")
+  public static var constrainedSugarType: Self {
     return .someOrAnyType
   }
-  
-  static var deinitEffectSpecifiers: Self {
+
+  @available(*, deprecated, renamed: "DeinitializerEffectSpecifiersSyntax")
+  public static var deinitEffectSpecifiers: Self {
     return .deinitializerEffectSpecifiers
   }
-  
-  static var derivativeRegistrationAttributeArguments: Self {
+
+  @available(*, deprecated, renamed: "DerivativeAttributeArgumentsSyntax")
+  public static var derivativeRegistrationAttributeArguments: Self {
     return .derivativeAttributeArguments
   }
-  
-  static var designatedTypeElement: Self {
+
+  @available(*, deprecated, renamed: "DesignatedTypeSyntax")
+  public static var designatedTypeElement: Self {
     return .designatedType
   }
-  
-  static var differentiabilityParam: Self {
+
+  @available(*, deprecated, renamed: "DifferentiabilityArgumentSyntax")
+  public static var differentiabilityParam: Self {
     return .differentiabilityArgument
   }
-  
-  static var differentiabilityParamList: Self {
+
+  @available(*, deprecated, renamed: "DifferentiabilityArgumentListSyntax")
+  public static var differentiabilityParamList: Self {
     return .differentiabilityArgumentList
   }
-  
-  static var differentiabilityParams: Self {
+
+  @available(*, deprecated, renamed: "DifferentiabilityArgumentsSyntax")
+  public static var differentiabilityParams: Self {
     return .differentiabilityArguments
   }
-  
-  static var differentiabilityParamsClause: Self {
+
+  @available(*, deprecated, renamed: "DifferentiabilityWithRespectToArgumentSyntax")
+  public static var differentiabilityParamsClause: Self {
     return .differentiabilityWithRespectToArgument
   }
-  
-  static var documentationAttributeArguments: Self {
+
+  @available(*, deprecated, renamed: "DocumentationAttributeArgumentListSyntax")
+  public static var documentationAttributeArguments: Self {
     return .documentationAttributeArgumentList
   }
-  
-  static var dynamicReplacementArguments: Self {
+
+  @available(*, deprecated, renamed: "DynamicReplacementAttributeArgumentsSyntax")
+  public static var dynamicReplacementArguments: Self {
     return .dynamicReplacementAttributeArguments
   }
-  
-  static var effectsArguments: Self {
+
+  @available(*, deprecated, renamed: "EffectsAttributeArgumentListSyntax")
+  public static var effectsArguments: Self {
     return .effectsAttributeArgumentList
   }
-  
-  static var enumCaseAssociatedValue: Self {
+
+  @available(*, deprecated, renamed: "EnumCaseParameterClauseSyntax")
+  public static var enumCaseAssociatedValue: Self {
     return .enumCaseParameterClause
   }
-  
-  static var fallthroughStmt: Self {
+
+  @available(*, deprecated, renamed: "FallThroughStmtSyntax")
+  public static var fallthroughStmt: Self {
     return .fallThroughStmt
   }
-  
-  static var forInStmt: Self {
+
+  @available(*, deprecated, renamed: "ForStmtSyntax")
+  public static var forInStmt: Self {
     return .forStmt
   }
-  
-  static var forcedValueExpr: Self {
+
+  @available(*, deprecated, renamed: "ForceUnwrapExprSyntax")
+  public static var forcedValueExpr: Self {
     return .forceUnwrapExpr
   }
-  
-  static var identifierExpr: Self {
+
+  @available(*, deprecated, renamed: "DeclReferenceExprSyntax")
+  public static var identifierExpr: Self {
     return .declReferenceExpr
   }
-  
-  static var labeledSpecializeEntry: Self {
+
+  @available(*, deprecated, renamed: "LabeledSpecializeArgumentSyntax")
+  public static var labeledSpecializeEntry: Self {
     return .labeledSpecializeArgument
   }
-  
-  static var memberDeclBlock: Self {
+
+  @available(*, deprecated, renamed: "MemberBlockSyntax")
+  public static var memberDeclBlock: Self {
     return .memberBlock
   }
-  
-  static var memberDeclList: Self {
+
+  @available(*, deprecated, renamed: "MemberBlockItemListSyntax")
+  public static var memberDeclList: Self {
     return .memberBlockItemList
   }
-  
-  static var memberDeclListItem: Self {
+
+  @available(*, deprecated, renamed: "MemberBlockItemSyntax")
+  public static var memberDeclListItem: Self {
     return .memberBlockItem
   }
-  
-  static var memberTypeIdentifier: Self {
+
+  @available(*, deprecated, renamed: "MemberTypeSyntax")
+  public static var memberTypeIdentifier: Self {
     return .memberType
   }
-  
-  static var modifierList: Self {
+
+  @available(*, deprecated, renamed: "DeclModifierListSyntax")
+  public static var modifierList: Self {
     return .declModifierList
   }
-  
-  static var moveExpr: Self {
+
+  @available(*, deprecated, renamed: "ConsumeExprSyntax")
+  public static var moveExpr: Self {
     return .consumeExpr
   }
-  
-  static var objCSelector: Self {
+
+  @available(*, deprecated, renamed: "ObjCSelectorPieceListSyntax")
+  public static var objCSelector: Self {
     return .objCSelectorPieceList
   }
-  
-  static var originallyDefinedInArguments: Self {
+
+  @available(*, deprecated, renamed: "OriginallyDefinedInAttributeArgumentsSyntax")
+  public static var originallyDefinedInArguments: Self {
     return .originallyDefinedInAttributeArguments
   }
-  
-  static var packReferenceType: Self {
+
+  @available(*, deprecated, renamed: "PackElementTypeSyntax")
+  public static var packReferenceType: Self {
     return .packElementType
   }
-  
-  static var parameterClause: Self {
+
+  @available(*, deprecated, renamed: "FunctionParameterClauseSyntax")
+  public static var parameterClause: Self {
     return .functionParameterClause
   }
-  
-  static var postfixUnaryExpr: Self {
+
+  @available(*, deprecated, renamed: "PostfixOperatorExprSyntax")
+  public static var postfixUnaryExpr: Self {
     return .postfixOperatorExpr
   }
-  
-  static var poundSourceLocationArgs: Self {
+
+  @available(*, deprecated, renamed: "PoundSourceLocationArgumentsSyntax")
+  public static var poundSourceLocationArgs: Self {
     return .poundSourceLocationArguments
   }
-  
-  static var precedenceGroupNameElement: Self {
+
+  @available(*, deprecated, renamed: "PrecedenceGroupNameSyntax")
+  public static var precedenceGroupNameElement: Self {
     return .precedenceGroupName
   }
-  
-  static var repeatWhileStmt: Self {
+
+  @available(*, deprecated, renamed: "RepeatStmtSyntax")
+  public static var repeatWhileStmt: Self {
     return .repeatStmt
   }
-  
-  static var simpleTypeIdentifier: Self {
+
+  @available(*, deprecated, renamed: "IdentifierTypeSyntax")
+  public static var simpleTypeIdentifier: Self {
     return .identifierType
   }
-  
-  static var specializeAttributeSpecList: Self {
+
+  @available(*, deprecated, renamed: "SpecializeAttributeArgumentListSyntax")
+  public static var specializeAttributeSpecList: Self {
     return .specializeAttributeArgumentList
   }
-  
-  static var specializeExpr: Self {
+
+  @available(*, deprecated, renamed: "GenericSpecializationExprSyntax")
+  public static var specializeExpr: Self {
     return .genericSpecializationExpr
   }
-  
-  static var stringLiteralSegments: Self {
+
+  @available(*, deprecated, renamed: "StringLiteralSegmentListSyntax")
+  public static var stringLiteralSegments: Self {
     return .stringLiteralSegmentList
   }
-  
-  static var subscriptExpr: Self {
+
+  @available(*, deprecated, renamed: "SubscriptCallExprSyntax")
+  public static var subscriptExpr: Self {
     return .subscriptCallExpr
   }
-  
-  static var superRefExpr: Self {
+
+  @available(*, deprecated, renamed: "SuperExprSyntax")
+  public static var superRefExpr: Self {
     return .superExpr
   }
-  
-  static var targetFunctionEntry: Self {
+
+  @available(*, deprecated, renamed: "SpecializeTargetFunctionArgumentSyntax")
+  public static var targetFunctionEntry: Self {
     return .specializeTargetFunctionArgument
   }
-  
-  static var tupleExprElement: Self {
+
+  @available(*, deprecated, renamed: "LabeledExprSyntax")
+  public static var tupleExprElement: Self {
     return .labeledExpr
   }
-  
-  static var tupleExprElementList: Self {
+
+  @available(*, deprecated, renamed: "LabeledExprListSyntax")
+  public static var tupleExprElementList: Self {
     return .labeledExprList
   }
-  
-  static var typeInheritanceClause: Self {
+
+  @available(*, deprecated, renamed: "InheritanceClauseSyntax")
+  public static var typeInheritanceClause: Self {
     return .inheritanceClause
   }
-  
-  static var typealiasDecl: Self {
+
+  @available(*, deprecated, renamed: "SimpleTypeSpecifierSyntax")
+  public static var typeSpecifier: Self {
+    return .simpleTypeSpecifier
+  }
+
+  @available(*, deprecated, renamed: "TypeAliasDeclSyntax")
+  public static var typealiasDecl: Self {
     return .typeAliasDecl
   }
-  
-  static var unavailableFromAsyncArguments: Self {
+
+  @available(*, deprecated, renamed: "UnavailableFromAsyncAttributeArgumentsSyntax")
+  public static var unavailableFromAsyncArguments: Self {
     return .unavailableFromAsyncAttributeArguments
   }
-  
-  static var unresolvedPatternExpr: Self {
+
+  @available(*, deprecated, renamed: "PatternExprSyntax")
+  public static var unresolvedPatternExpr: Self {
     return .patternExpr
   }
-  
-  static var yieldExprList: Self {
+
+  @available(*, deprecated, renamed: "YieldedExpressionListSyntax")
+  public static var yieldExprList: Self {
     return .yieldedExpressionList
   }
-  
-  static var yieldExprListElement: Self {
+
+  @available(*, deprecated, renamed: "YieldedExpressionSyntax")
+  public static var yieldExprListElement: Self {
     return .yieldedExpression
   }
-  
-  static var yieldList: Self {
+
+  @available(*, deprecated, renamed: "YieldedExpressionsClauseSyntax")
+  public static var yieldList: Self {
     return .yieldedExpressionsClause
   }
 }

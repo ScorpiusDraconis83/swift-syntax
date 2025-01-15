@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension Parser {
   mutating func parseAnyIdentifier() -> RawTokenSyntax {
@@ -29,7 +33,7 @@ extension Parser {
     }
     if let dollarIdent = self.consume(if: .dollarIdentifier) {
       return (
-        RawUnexpectedNodesSyntax(elements: [RawSyntax(dollarIdent)], arena: self.arena),
+        RawUnexpectedNodesSyntax([dollarIdent], arena: self.arena),
         self.missingToken(.identifier)
       )
     } else {
@@ -66,10 +70,16 @@ extension Parser {
   mutating func parseDeclReferenceExpr(_ flags: DeclNameOptions = []) -> RawDeclReferenceExprSyntax {
     // Consume the base name.
     let base: RawTokenSyntax
-    if let identOrSelf = self.consume(if: .identifier, .keyword(.self), .keyword(.Self)) ?? self.consume(if: .keyword(.`init`)) {
+    if let identOrSelf = self.consume(if: .identifier, .keyword(.self), .keyword(.Self))
+      ?? self.consume(if: .keyword(.`init`))
+    {
       base = identOrSelf
     } else if flags.contains(.operators), let (_, _) = self.at(anyIn: Operator.self) {
       base = self.consumeAnyToken(remapping: .binaryOperator)
+    } else if flags.contains(.keywordsUsingSpecialNames),
+      let special = self.consume(if: .keyword(.`deinit`), .keyword(.`subscript`))
+    {
+      base = special
     } else if flags.contains(.keywords) && self.currentToken.isLexerClassifiedKeyword {
       base = self.consumeAnyToken(remapping: .identifier)
     } else {
@@ -183,7 +193,7 @@ extension Parser {
 
     let (unexpectedBeforeName, name) = self.expect(anyIn: IdentifierTypeSyntax.NameOptions.self, default: .identifier)
     let generics: RawGenericArgumentClauseSyntax?
-    if self.atContextualPunctuator("<") {
+    if self.at(prefix: "<") {
       generics = self.parseGenericArguments()
     } else {
       generics = nil
@@ -201,10 +211,10 @@ extension Parser {
     // If qualified name base type cannot be parsed from the current
     // point (i.e. the next type identifier is not followed by a '.'),
     // then the next identifier is the final declaration name component.
-    var backtrack = self.lookahead()
+    var lookahead = self.lookahead()
     guard
-      backtrack.consume(ifPrefix: ".", as: .period) != nil,
-      backtrack.canParseBaseTypeForQualifiedDeclName()
+      lookahead.consume(ifPrefix: ".", as: .period) != nil,
+      lookahead.canParseBaseTypeForQualifiedDeclName()
     else {
       return result
     }
@@ -212,9 +222,14 @@ extension Parser {
     var keepGoing = self.consume(if: .period)
     var loopProgress = LoopProgressCondition()
     while keepGoing != nil && self.hasProgressed(&loopProgress) {
-      let (unexpectedBeforeName, name) = self.expect(.identifier, .keyword(.self), TokenSpec(.Self, remapping: .identifier), default: .identifier)
+      let (unexpectedBeforeName, name) = self.expect(
+        .identifier,
+        .keyword(.self),
+        TokenSpec(.Self, remapping: .identifier),
+        default: .identifier
+      )
       let generics: RawGenericArgumentClauseSyntax?
-      if self.atContextualPunctuator("<") {
+      if self.at(prefix: "<") {
         generics = self.parseGenericArguments()
       } else {
         generics = nil
@@ -233,10 +248,10 @@ extension Parser {
       // If qualified name base type cannot be parsed from the current
       // point (i.e. the next type identifier is not followed by a '.'),
       // then the next identifier is the final declaration name component.
-      var backtrack = self.lookahead()
+      var lookahead = self.lookahead()
       guard
-        backtrack.consume(ifPrefix: ".", as: .period) != nil,
-        backtrack.canParseBaseTypeForQualifiedDeclName()
+        lookahead.consume(ifPrefix: ".", as: .period) != nil,
+        lookahead.canParseBaseTypeForQualifiedDeclName()
       else {
         break
       }

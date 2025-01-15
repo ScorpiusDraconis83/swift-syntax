@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 /// Describes how distinctive a token is for parser recovery.
 ///
@@ -100,10 +104,10 @@ enum TokenPrecedence: Comparable {
     return precedence(lhs) < precedence(rhs)
   }
 
-  /// When expecting a token with `stmtKeyword` precedence or higher, newlines may be skipped to find that token.
+  /// When expecting a token with `weakBracketClose` precedence or higher, newlines may be skipped to find that token.
   /// For lower precedence groups, we consider newlines the end of the lookahead scope.
   var shouldSkipOverNewlines: Bool {
-    return self >= .stmtKeyword
+    return self >= .weakBracketClose
   }
 
   init(_ lexeme: Lexer.Lexeme) {
@@ -203,9 +207,7 @@ enum TokenPrecedence: Comparable {
       // Consider 'any' a prefix operator to a type and a type is expression-like.
       .Any,
       // 'where' can only occur in the signature of declarations. Consider the signature expression-like.
-      .where,
-      // 'in' occurs in closure input/output definitions and for loops. Consider both constructs expression-like.
-      .in:
+      .where:
       self = .exprKeyword
 
     case  // Control-flow constructs
@@ -213,7 +215,9 @@ enum TokenPrecedence: Comparable {
       // Secondary parts of control-flow constructs
       .case, .catch, .default, .else,
       // Return-like statements
-      .break, .continue, .fallthrough, .return, .throw, .then, .yield:
+      .break, .continue, .fallthrough, .return, .throw, .then, .yield,
+      // 'in' occurs in closure input/output definitions and for loops. Consider both constructs expression-like.
+      .in:
       self = .stmtKeyword
 
     // MARK: Decl keywords
@@ -228,12 +232,14 @@ enum TokenPrecedence: Comparable {
       // Operator stuff
       .operator, .precedencegroup,
       // Declaration Modifiers
-      .__consuming, .final, .required, .optional, .lazy, .dynamic, .infix, .postfix, .prefix, .mutating, .nonmutating, .convenience, .override, .package, .open,
+      .__consuming, .final, .required, .optional, .lazy, .dynamic, .infix, .postfix, .prefix, .mutating, .nonmutating,
+      .convenience, .override, .package, .open,
       .__setter_access, .indirect, .isolated, .nonisolated, .distributed, ._local,
-      .inout, ._mutating, ._borrow, ._borrowing, .borrowing, ._consuming, .consuming, .consume, ._resultDependsOnSelf, ._resultDependsOn,
+      .inout, ._mutating, ._borrow, ._borrowing, .borrow, .borrowing, ._consuming, .consuming, .consume,
+      .dependsOn, .scoped, .sending,
       // Accessors
       .get, .set, .didSet, .willSet, .unsafeAddress, .addressWithOwner, .addressWithNativeOwner, .unsafeMutableAddress,
-      .mutableAddressWithOwner, .mutableAddressWithNativeOwner, ._read, ._modify,
+      .mutableAddressWithOwner, .mutableAddressWithNativeOwner, ._read, .read, ._modify, .modify,
       // Misc
       .import:
       self = .declKeyword
@@ -247,9 +253,11 @@ enum TokenPrecedence: Comparable {
       .escaping,
       .noDerivative,
       .noescape,
+      .preconcurrency,
       .Sendable,
       .retroactive,
       .unchecked:
+      // Note that .isolated is preferred as a decl keyword
       self = .exprKeyword
 
     case  // `DeclarationAttributeWithSpecialSyntax`
@@ -275,11 +283,13 @@ enum TokenPrecedence: Comparable {
       ._swift_native_objc_runtime_base,
       ._typeEraser,
       ._unavailableFromAsync,
+      .abi,
       .attached,
       .available,
       .backDeployed,
       .derivative,
       .exclusivity,
+      .freestanding,
       .inline,
       .objc,
       .transpose:
@@ -354,6 +364,10 @@ enum TokenPrecedence: Comparable {
       .wrt,
       .unsafe:
       self = .exprKeyword
+    #if RESILIENT_LIBRARIES
+    @unknown default:
+      fatalError()
+    #endif
     }
   }
 }

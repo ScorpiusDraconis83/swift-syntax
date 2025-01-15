@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Describes a "some" parameter that has been rewritten into a generic
 /// parameter.
@@ -56,7 +60,7 @@ fileprivate class SomeParameterRewriter: SyntaxRewriter {
 
     let genericParam = GenericParameterSyntax(
       attributes: [],
-      eachKeyword: nil,
+      specifier: nil,
       name: paramNameSyntax,
       colon: colon,
       inheritedType: inheritedType,

@@ -44,6 +44,127 @@ fileprivate struct ConstantOneGetter: AccessorMacro {
 final class AccessorMacroTests: XCTestCase {
   private let indentationWidth: Trivia = .spaces(2)
 
+  func testAccessorOnVariableDeclWithTrailingLineCommentAndNoAccessorBlock() {
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x: Int /*1*/ // hello
+      """,
+      expandedSource: """
+        var x: Int { /*1*/ // hello
+          get {
+            return 1
+          }
+        }
+        """,
+      macros: ["constantOne": ConstantOneGetter.self],
+      indentationWidth: indentationWidth
+    )
+
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x: Int /// hello
+      """,
+      expandedSource: """
+        var x: Int { /// hello
+          get {
+            return 1
+          }
+        }
+        """,
+      macros: ["constantOne": ConstantOneGetter.self],
+      indentationWidth: indentationWidth
+    )
+
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x: Int = 1 /// hello
+      """,
+      expandedSource: """
+        var x: Int { /// hello
+          get {
+            return 1
+          }
+        }
+        """,
+      macros: ["constantOne": ConstantOneGetter.self],
+      indentationWidth: indentationWidth
+    )
+
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x /// hello
+      """,
+      expandedSource: """
+        var x { /// hello
+          get {
+            return 1
+          }
+        }
+        """,
+      macros: ["constantOne": ConstantOneGetter.self],
+      indentationWidth: indentationWidth
+    )
+  }
+
+  func testAccessorOnVariableDeclWithTrailingLineCommentAndAccessorBlock() {
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x: Int /*h*/ { // hello
+        1
+      }
+      """,
+      expandedSource: """
+        var x: Int /*h*/ { // hello
+        get {
+            1
+        }
+          get {
+            return 1
+          }
+        }
+        """,
+      macros: ["constantOne": ConstantOneGetter.self],
+      indentationWidth: indentationWidth
+    )
+  }
+
+  func testAccessorOnVariableDeclWithTrailingCommentsAndSingleLineGetterExpansion() {
+    struct ConstantOneSingleLineGetter: AccessorMacro {
+      static let formatMode: FormatMode = .disabled
+
+      static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+      ) throws -> [AccessorDeclSyntax] {
+        return [
+          """
+          get { 1 }
+          """
+        ]
+      }
+    }
+
+    assertMacroExpansion(
+      """
+      @constantOne
+      var x: Int // hello
+      """,
+      expandedSource: """
+        var x: Int { // hello
+        get { 1 }
+        }
+        """,
+      macros: ["constantOne": ConstantOneSingleLineGetter.self],
+      indentationWidth: indentationWidth
+    )
+  }
+
   func testAccessorOnVariableDeclWithExistingGetter() {
     assertMacroExpansion(
       """
@@ -299,7 +420,7 @@ final class AccessorMacroTests: XCTestCase {
         providingAccessorsOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
       ) throws -> [AccessorDeclSyntax] {
-        context.diagnose(Diagnostic(node: node, message: MacroExpansionErrorMessage("test")))
+        context.diagnose(Diagnostic(node: node, message: SwiftSyntaxMacros.MacroExpansionErrorMessage("test")))
         return []
       }
     }
@@ -409,6 +530,39 @@ final class AccessorMacroTests: XCTestCase {
         """,
       macros: ["addDidSet": DidSetAdder.self],
       indentationWidth: indentationWidth
+    )
+  }
+
+  func testClosureInAccessorMacro() {
+    enum PropertyWrapperMacro: AccessorMacro {
+      public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+      ) throws -> [AccessorDeclSyntax] {
+        guard let structDecl = context.lexicalContext.first?.as(StructDeclSyntax.self) else {
+          return []
+        }
+
+        return ["get { \(literal: structDecl.name.text) }"]
+      }
+    }
+    assertMacroExpansion(
+      """
+      struct Foo {
+          @TestWrapper(b: { a in 1 }) var test3: Thing
+      }
+      """,
+      expandedSource: """
+        struct Foo {
+            var test3: Thing {
+                get {
+                    "Foo"
+                }
+            }
+        }
+        """,
+      macros: ["TestWrapper": PropertyWrapperMacro.self]
     )
   }
 }

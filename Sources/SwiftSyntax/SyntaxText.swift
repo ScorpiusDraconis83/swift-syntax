@@ -10,12 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
 #if canImport(Darwin)
-@_implementationOnly import Darwin
+private import Darwin
 #elseif canImport(Glibc)
-@_implementationOnly import Glibc
+private import Glibc
+#elseif canImport(Bionic)
+private import Bionic
 #elseif canImport(Musl)
-@_implementationOnly import Musl
+private import Musl
+#endif
+#else
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 #endif
 
 /// Represent a string.
@@ -34,11 +46,12 @@
 /// `Swift.String`, ill-formed UTF8 sequences are replaced with the Unicode
 /// replacement character (`\u{FFFD}`).
 @_spi(RawSyntax)
-public struct SyntaxText {
-  var buffer: UnsafeBufferPointer<UInt8>
+public struct SyntaxText: Sendable {
+  public typealias Buffer = SyntaxArenaAllocatedBufferPointer<UInt8>
+  var buffer: Buffer
 
   /// Construct a ``SyntaxText`` whose text is represented by the given `buffer`.
-  public init(buffer: UnsafeBufferPointer<UInt8>) {
+  public init(buffer: Buffer) {
     self.buffer = buffer
   }
 
@@ -51,7 +64,7 @@ public struct SyntaxText {
       count == 0 || baseAddress != nil,
       "If count is not zero, base address must be exist"
     )
-    buffer = .init(start: baseAddress, count: count)
+    buffer = .init(UnsafeBufferPointer(start: baseAddress, count: count))
   }
 
   /// Creates an empty ``SyntaxText``
@@ -168,6 +181,18 @@ extension SyntaxText: RandomAccessCollection {
   public subscript(index: Index) -> Element {
     get { return buffer[index] }
   }
+
+  public func makeIterator() -> Buffer.Iterator {
+    buffer.makeIterator()
+  }
+
+  public func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<Element>) throws -> R) rethrows -> R? {
+    try buffer.withContiguousStorageIfAvailable(body)
+  }
+
+  public func _copyContents(initializing ptr: UnsafeMutableBufferPointer<Element>) -> (Iterator, Int) {
+    buffer._copyContents(initializing: ptr)
+  }
 }
 
 extension SyntaxText: Hashable {
@@ -193,7 +218,7 @@ extension SyntaxText: Hashable {
 
   /// Hash the contents of this ``SyntaxText`` into `hasher`.
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(bytes: .init(buffer))
+    hasher.combine(bytes: buffer.unsafeRawBufferPointer)
   }
 }
 
@@ -271,6 +296,8 @@ private func compareMemory(
   return Darwin.memcmp(s1, s2, count) == 0
   #elseif canImport(Glibc)
   return Glibc.memcmp(s1, s2, count) == 0
+  #elseif canImport(Bionic)
+  return Bionic.memcmp(s1, s2, count) == 0
   #else
   return UnsafeBufferPointer(start: s1, count: count)
     .elementsEqual(UnsafeBufferPointer(start: s2, count: count))

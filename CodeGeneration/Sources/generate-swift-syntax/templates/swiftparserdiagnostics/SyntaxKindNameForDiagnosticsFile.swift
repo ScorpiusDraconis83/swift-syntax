@@ -16,7 +16,15 @@ import SyntaxSupport
 import Utils
 
 let syntaxKindNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("@_spi(ExperimentalLanguageFeatures) import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+    #else
+    @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+    #endif
+    """
+  )
 
   try! ExtensionDeclSyntax("extension SyntaxKind") {
     try VariableDeclSyntax("var nameForDiagnostics: String?") {
@@ -27,7 +35,7 @@ let syntaxKindNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightH
 
         for node in NON_BASE_SYNTAX_NODES {
           if let nameForDiagnostics = node.nameForDiagnostics {
-            SwitchCaseSyntax("case .\(node.varOrCaseName):") {
+            SwitchCaseSyntax("case .\(node.enumCaseCallName):") {
               StmtSyntax("return \(literal: nameForDiagnostics)")
             }
           }

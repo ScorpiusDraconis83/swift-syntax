@@ -8,12 +8,14 @@
 
 add_swift_syntax_library(SwiftSyntax
   AbsolutePosition.swift
-  AbsoluteRawSyntax.swift
   AbsoluteSyntaxInfo.swift
   Assert.swift
   BumpPtrAllocator.swift
   CommonAncestor.swift
   Convenience.swift
+  CustomTraits.swift
+  EditorPlaceholder.swift
+  Identifier.swift
   MemoryLayout.swift
   MissingNodeInitializers.swift
   SourceEdit.swift
@@ -23,6 +25,7 @@ add_swift_syntax_library(SwiftSyntax
   SwiftSyntaxCompatibility.swift
   Syntax.swift
   SyntaxArena.swift
+  SyntaxArenaAllocatedBuffer.swift
   SyntaxChildren.swift
   SyntaxCollection.swift
   SyntaxHashable.swift
@@ -79,3 +82,6 @@ add_swift_syntax_library(SwiftSyntax
   generated/syntaxNodes/SyntaxNodesQRS.swift
   generated/syntaxNodes/SyntaxNodesTUVWXYZ.swift
 )
+
+target_link_swift_syntax_libraries(SwiftSyntax PRIVATE
+  _SwiftSyntaxCShims)

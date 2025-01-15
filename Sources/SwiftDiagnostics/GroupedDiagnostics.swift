@@ -9,7 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 public struct GroupedDiagnostics {
   /// A unique identifier for a source file.
@@ -23,7 +28,10 @@ public struct GroupedDiagnostics {
     let id: SourceFileID
 
     /// The syntax tree for the source file.
-    let tree: SourceFileSyntax
+    let tree: Syntax
+
+    /// The source location converter for this source file.
+    let sourceLocationConverter: SourceLocationConverter
 
     /// The human-readable name to use to identify this source file.
     let displayName: String
@@ -47,7 +55,7 @@ public struct GroupedDiagnostics {
 
   /// Mapping from the root source file syntax nodes to the corresponding
   /// source file IDs.
-  var rootIndexes: [SourceFileSyntax: SourceFileID] = [:]
+  var rootIndexes: [Syntax: SourceFileID] = [:]
 
   public init() {}
 
@@ -63,18 +71,26 @@ public struct GroupedDiagnostics {
   /// - Returns: The unique ID for this source file.
   @discardableResult
   public mutating func addSourceFile(
-    tree: SourceFileSyntax,
+    tree: some SyntaxProtocol,
+    sourceLocationConverter: SourceLocationConverter? = nil,
     displayName: String,
     parent: (SourceFileID, AbsolutePosition)? = nil,
     diagnostics: [Diagnostic] = []
   ) -> SourceFileID {
+    let tree = Syntax(tree)
     // Determine the ID this source file will have.
     let id = SourceFileID(id: sourceFiles.count)
-
+    let slc =
+      sourceLocationConverter
+      ?? SourceLocationConverter(
+        fileName: displayName,
+        tree: tree
+      )
     sourceFiles.append(
       SourceFile(
         id: id,
         tree: tree,
+        sourceLocationConverter: slc,
         displayName: displayName,
         parent: parent,
         diagnostics: diagnostics
@@ -93,11 +109,7 @@ public struct GroupedDiagnostics {
 
   /// Find the ID of the source file containing this syntax node.
   func findSourceFileContaining(_ node: Syntax) -> SourceFileID? {
-    guard let rootSourceFile = node.root.as(SourceFileSyntax.self) else {
-      return nil
-    }
-
-    return rootIndexes[rootSourceFile]
+    return rootIndexes[node.root]
   }
 
   /// Add a diagnostic to the set of grouped diagnostics.
@@ -167,13 +179,10 @@ extension GroupedDiagnostics {
     indentString: String
   ) -> String {
     let sourceFile = sourceFiles[sourceFileID.id]
-    let slc = SourceLocationConverter(
-      fileName: sourceFile.displayName,
-      tree: sourceFile.tree
-    )
+    let slc = sourceFile.sourceLocationConverter
     let diagnosticDecorator = formatter.diagnosticDecorator
 
-    let childPadding = String(slc.sourceLines.count + 1).count + 1;
+    let childPadding = String(slc.sourceLines.count + 1).count + 1
 
     // Collect the child sources.
     var childSources: [AbsolutePosition: String] = [:]
@@ -181,7 +190,7 @@ extension GroupedDiagnostics {
       let childSource = annotateSource(
         childBufferID,
         formatter: formatter,
-        indentString: indentString + String(repeating: " ", count: childPadding) + "│"
+        indentString: indentString + String(repeating: " ", count: childPadding) + "|"
       )
 
       childSources[sourceFiles[childBufferID.id].parent!.1, default: ""].append(childSource)
@@ -195,12 +204,12 @@ extension GroupedDiagnostics {
     if isRoot {
       // If there's a primary diagnostic, print it first.
       if let (primaryDiagSourceFile, primaryDiag) = findPrimaryDiagnostic(in: sourceFile) {
-        let primaryDiagSLC = SourceLocationConverter(fileName: primaryDiagSourceFile.displayName, tree: primaryDiagSourceFile.tree)
+        let primaryDiagSLC = primaryDiagSourceFile.sourceLocationConverter
         let location = primaryDiag.location(converter: primaryDiagSLC)
 
         // Display file/line/column and diagnostic text for the primary diagnostic.
         prefixString =
-          "\(location.file):\(location.line):\(location.column): \(diagnosticDecorator.decorateDiagnosticMessage(primaryDiag.diagMessage))\n"
+          "\(location.presumedFile):\(location.presumedLine):\(location.column): \(diagnosticDecorator.decorateDiagnosticMessage(primaryDiag.diagMessage))\n"
 
         // If the primary diagnostic source file is not the same as the root source file, we're pointing into a generated buffer.
         // Provide a link back to the original source file where this generated buffer occurred, so it's easy to find if
@@ -216,8 +225,11 @@ extension GroupedDiagnostics {
 
           if rootSourceID == sourceFileID {
             let bufferLoc = slc.location(for: rootPosition)
-            let decoratedMessage = diagnosticDecorator.decorateMessage("expanded code originates here", basedOnSeverity: .note)
-            prefixString += "╰─ \(bufferLoc.file):\(bufferLoc.line):\(bufferLoc.column): \(decoratedMessage)\n"
+            let decoratedMessage = diagnosticDecorator.decorateMessage(
+              "expanded code originates here",
+              basedOnSeverity: .note
+            )
+            prefixString += "`- \(bufferLoc.file):\(bufferLoc.line):\(bufferLoc.column): \(decoratedMessage)\n"
           }
         }
       } else {
@@ -234,14 +246,17 @@ extension GroupedDiagnostics {
       let extraLengthNeeded = targetLineLength - padding.count - sourceFile.displayName.count - 6
       let boxSuffix: String
       if extraLengthNeeded > 0 {
-        boxSuffix = diagnosticDecorator.decorateBufferOutline(String(repeating: "─", count: extraLengthNeeded))
+        boxSuffix = diagnosticDecorator.decorateBufferOutline(String(repeating: "-", count: extraLengthNeeded))
       } else {
         boxSuffix = ""
       }
 
-      prefixString = diagnosticDecorator.decorateBufferOutline(padding + "╭─── ") + sourceFile.displayName + " " + boxSuffix + "\n"
+      prefixString =
+        diagnosticDecorator.decorateBufferOutline(padding + "+--- ") + sourceFile.displayName + " " + boxSuffix + "\n"
       suffixString =
-        diagnosticDecorator.decorateBufferOutline(padding + "╰───" + String(repeating: "─", count: sourceFile.displayName.count + 2)) + boxSuffix + "\n"
+        diagnosticDecorator.decorateBufferOutline(
+          padding + "+---" + String(repeating: "-", count: sourceFile.displayName.count + 2)
+        ) + boxSuffix + "\n"
     }
 
     // Render the buffer.

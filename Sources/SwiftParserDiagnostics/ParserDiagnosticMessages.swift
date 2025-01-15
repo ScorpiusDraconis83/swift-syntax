@@ -10,9 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftDiagnostics
+@_spi(Diagnostics) internal import SwiftParser
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 import SwiftDiagnostics
 @_spi(Diagnostics) import SwiftParser
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 fileprivate let diagnosticDomain: String = "SwiftParser"
 
@@ -21,16 +27,16 @@ public protocol ParserError: DiagnosticMessage {
   var diagnosticID: MessageID { get }
 }
 
-public extension ParserError {
-  static var diagnosticID: MessageID {
+extension ParserError {
+  public static var diagnosticID: MessageID {
     return MessageID(domain: diagnosticDomain, id: "\(self)")
   }
 
-  var diagnosticID: MessageID {
+  public var diagnosticID: MessageID {
     return Self.diagnosticID
   }
 
-  var severity: DiagnosticSeverity {
+  public var severity: DiagnosticSeverity {
     return .error
   }
 }
@@ -39,17 +45,17 @@ public protocol ParserNote: NoteMessage {
   var noteID: MessageID { get }
 }
 
-public extension ParserNote {
+extension ParserNote {
   @available(*, deprecated, message: "Use noteID instead.", renamed: "noteID")
-  static var fixItID: MessageID {
+  public static var fixItID: MessageID {
     return Self.noteID
   }
 
-  static var noteID: MessageID {
+  public static var noteID: MessageID {
     return MessageID(domain: diagnosticDomain, id: "\(self)")
   }
 
-  var noteID: MessageID {
+  public var noteID: MessageID {
     return Self.noteID
   }
 }
@@ -58,12 +64,12 @@ public protocol ParserFixIt: FixItMessage {
   var fixItID: MessageID { get }
 }
 
-public extension ParserFixIt {
-  static var fixItID: MessageID {
+extension ParserFixIt {
+  public static var fixItID: MessageID {
     return MessageID(domain: diagnosticDomain, id: "\(self)")
   }
 
-  var fixItID: MessageID {
+  public var fixItID: MessageID {
     return Self.fixItID
   }
 }
@@ -97,12 +103,6 @@ extension DiagnosticMessage where Self == StaticParserError {
   }
   public static var associatedTypeCannotUsePack: Self {
     .init("associated types cannot be variadic")
-  }
-  public static var canImportWrongSecondParameterLabel: Self {
-    .init("2nd parameter of canImport should be labeled as _version or _underlyingVersion")
-  }
-  public static var canImportWrongNumberOfParameter: Self {
-    .init("canImport can take only two parameters")
   }
   public static var caseOutsideOfSwitchOrEnum: Self {
     .init("'case' can only appear inside a 'switch' statement or 'enum' declaration")
@@ -176,9 +176,6 @@ extension DiagnosticMessage where Self == StaticParserError {
   public static var initializerCannotHaveName: Self {
     .init("initializers cannot have a name")
   }
-  public static var initializerCannotHaveResultType: Self {
-    .init("initializers cannot have a result type")
-  }
   public static var invalidFlagAfterPrecedenceGroupAssignment: Self {
     .init("expected 'true' or 'false' after 'assignment'")
   }
@@ -193,6 +190,9 @@ extension DiagnosticMessage where Self == StaticParserError {
   }
   public static var maximumNestingLevelOverflow: Self {
     .init("parsing has exceeded the maximum nesting level")
+  }
+  public static var misplacedAttributeInVarDecl: Self {
+    .init("misplaced attribute in variable declaration")
   }
   public static var missingColonAndExprInTernaryExpr: Self {
     .init("expected ':' and expression after '? ...' in ternary expression")
@@ -275,7 +275,8 @@ public struct AsyncMustPrecedeThrows: ParserError {
   public let throwsKeyword: TokenSyntax
 
   public var message: String {
-    return "\(nodesDescription(asyncKeywords, format: false)) must precede \(nodesDescription([throwsKeyword], format: false))"
+    return
+      "\(nodesDescription(asyncKeywords, format: false)) must precede \(nodesDescription([throwsKeyword], format: false))"
   }
 }
 
@@ -292,7 +293,8 @@ public struct AvailabilityConditionInExpression: ParserError {
   public let availabilityCondition: AvailabilityConditionSyntax
 
   public var message: String {
-    return "\(nodesDescription([availabilityCondition], format: false)) cannot be used in an expression, only as a condition of 'if' or 'guard'"
+    return
+      "\(nodesDescription([availabilityCondition], format: false)) cannot be used in an expression, only as a condition of 'if' or 'guard'"
   }
 }
 
@@ -301,6 +303,30 @@ public struct CannotParseVersionTuple: ParserError {
 
   public var message: String {
     return "cannot parse version component \(versionTuple.shortSingleLineContentDescription)"
+  }
+}
+
+public struct DeclarationNotPermittedInContext: ParserError {
+  public var missingDecl: MissingDeclSyntax
+  public var invalidDecl: DeclSyntax
+
+  public var message: String {
+    return "\(self.invalidDeclDescription) is not permitted \(self.missingDeclContextDescription)"
+  }
+
+  var invalidDeclDescription: String {
+    return invalidDecl.kind.nameForDiagnostics ?? "declaration"
+  }
+
+  var missingDeclContextDescription: String {
+    guard
+      let description = missingDecl.parent?.ancestorOrSelf(mapping: { ancestor in
+        ancestor.nodeTypeNameForDiagnostics(allowBlockNames: false)
+      })
+    else {
+      return "here"
+    }
+    return "as \(description)"
   }
 }
 
@@ -342,7 +368,8 @@ public struct DuplicateEffectSpecifiers: ParserError {
     if correctSpecifier.tokenKind == unexpectedSpecifier.tokenKind {
       return "\(nodesDescription([unexpectedSpecifier], format: false)) has already been specified"
     } else {
-      return "\(nodesDescription([unexpectedSpecifier], format: false)) conflicts with \(nodesDescription([correctSpecifier], format: false))"
+      return
+        "\(nodesDescription([unexpectedSpecifier], format: false)) conflicts with \(nodesDescription([correctSpecifier], format: false))"
     }
   }
 }
@@ -375,7 +402,23 @@ public struct IdentifierNotAllowedInOperatorName: ParserError {
   public let identifier: TokenSyntax
 
   public var message: String {
-    return "\(nodesDescription([identifier], format: false)) is considered an identifier and must not appear within an operator name"
+    return
+      "\(nodesDescription([identifier], format: false)) is considered an identifier and must not appear within an operator name"
+  }
+}
+
+public struct IfConfigDeclNotAllowedInContext: ParserError {
+  public let context: Syntax
+
+  private var contextDescription: String {
+    if let description = context.ancestorOrSelf(mapping: { $0.nodeTypeNameForDiagnostics(allowBlockNames: true) }) {
+      return "in \(description)"
+    }
+    return "here"
+  }
+
+  public var message: String {
+    return "conditional compilation not permitted \(contextDescription)"
   }
 }
 
@@ -383,7 +426,8 @@ public struct InvalidFloatLiteralMissingLeadingZero: ParserError {
   public let decimalDigits: TokenSyntax
 
   public var message: String {
-    return "'.\(decimalDigits.text)' is not a valid floating point literal; it must be written '0.\(decimalDigits.text)'"
+    return
+      "'.\(decimalDigits.text)' is not a valid floating point literal; it must be written '0.\(decimalDigits.text)'"
   }
 }
 
@@ -409,7 +453,7 @@ public struct InvalidIdentifierError: ParserError {
 }
 
 public struct InvalidIndentationInMultiLineStringLiteralError: ParserError {
-  public enum Kind {
+  public enum Kind: Sendable {
     case insufficientIndentation
     case unexpectedSpace
     case unexpectedTab
@@ -543,10 +587,13 @@ public struct UnexpectedNodesError: ParserError {
     var message = "unexpected \(unexpectedNodes.shortSingleLineContentDescription)"
     if let parent = unexpectedNodes.parent {
       if let parentTypeName = parent.nodeTypeNameForDiagnostics(allowBlockNames: false),
-        parent.children(viewMode: .sourceAccurate).first(where: { $0.totalLength.utf8Length > 0 })?.id == unexpectedNodes.id
+        parent.children(viewMode: .sourceAccurate).first(where: { $0.totalLength.utf8Length > 0 })?.id
+          == unexpectedNodes.id
       {
         message += " before \(parentTypeName)"
-      } else if let parentTypeName = parent.ancestorOrSelf(mapping: { $0.nodeTypeNameForDiagnostics(allowBlockNames: false) }) {
+      } else if let parentTypeName = parent.ancestorOrSelf(mapping: {
+        $0.nodeTypeNameForDiagnostics(allowBlockNames: false)
+      }) {
         message += " in \(parentTypeName)"
       }
     }
@@ -569,7 +616,9 @@ public struct UnknownParameterError: ParserError {
   public var message: String {
     var message = "unknown parameter '\(parameter.text)'"
 
-    if let parentTypeName = parameter.parent?.ancestorOrSelf(mapping: { $0.nodeTypeNameForDiagnostics(allowBlockNames: false) }) {
+    if let parentTypeName = parameter.parent?.ancestorOrSelf(mapping: {
+      $0.nodeTypeNameForDiagnostics(allowBlockNames: false)
+    }) {
       message += " in \(parentTypeName)"
     }
 
@@ -645,6 +694,9 @@ extension FixItMessage where Self == StaticParserFixIt {
   public static var insertAttributeArguments: Self {
     .init("insert attribute argument")
   }
+  public static var insertBackslash: Self {
+    .init(#"insert '\'"#)
+  }
   public static var insertNewline: Self {
     .init("insert newline")
   }
@@ -658,7 +710,7 @@ extension FixItMessage where Self == StaticParserFixIt {
     .init("join the identifiers together with camel-case")
   }
   public static var removeBackslash: Self {
-    .init("remove '\'")
+    .init(#"remove '\'"#)
   }
   public static var removeExtraneousDelimiters: Self {
     .init("remove extraneous delimiters")
@@ -680,6 +732,9 @@ extension FixItMessage where Self == StaticParserFixIt {
   }
   public static var wrapInBackticks: Self {
     .init("if this name is unavoidable, use backticks to escape it")
+  }
+  public static var convertToExtendedRegexLiteral: Self {
+    .init("convert to extended regex literal with '#'")
   }
 }
 
@@ -703,15 +758,15 @@ public struct MoveTokensAfterFixIt: ParserFixIt {
   }
 }
 
-public struct MoveTokensInFrontOfFixIt: ParserFixIt {
-  /// The token that should be moved
-  public let movedTokens: [TokenSyntax]
+public struct MoveNodesInFrontOfFixIt<Node: SyntaxProtocol>: ParserFixIt {
+  /// The nodes that should be moved
+  public let movedNodes: [Node]
 
-  /// The token before which 'movedTokens' should be moved
+  /// The token before which `movedNodes` should be moved
   public let inFrontOf: TokenKind
 
   public var message: String {
-    "move \(nodesDescription(movedTokens, format: false)) in front of '\(inFrontOf.nameForDiagnostics)'"
+    "move \(nodesDescription(movedNodes, format: false)) in front of '\(inFrontOf.nameForDiagnostics)'"
   }
 }
 

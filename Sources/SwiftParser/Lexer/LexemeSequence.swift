@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) @_spi(BumpPtrAllocator) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) @_spi(BumpPtrAllocator) import SwiftSyntax
+#endif
 
 extension Lexer {
   /// A sequence of ``Lexer/Lexeme`` tokens starting from a ``Lexer/Cursor``
@@ -30,7 +34,7 @@ extension Lexer {
     ///
     /// The memory footprint of not freeing past lexer states is negligible. It's
     /// usually less than 0.1% of the memory allocated by the syntax arena.
-    var lexerStateAllocator = BumpPtrAllocator(slabSize: 256)
+    var lexerStateAllocator = BumpPtrAllocator(initialSlabSize: 256)
 
     /// The offset of the trailing trivia end of `nextToken` relative to the source buffer’s start.
     var offsetToNextTokenEnd: Int {
@@ -44,10 +48,17 @@ extension Lexer {
     ///  - ``LookaheadTracker`` is not a class to avoid reference counting it. The ``Parser`` that creates the ``LexemeSequence`` will always outlive any ``Lookahead`` created for it.
     let lookaheadTracker: UnsafeMutablePointer<LookaheadTracker>
 
-    fileprivate init(sourceBufferStart: Lexer.Cursor, cursor: Lexer.Cursor, lookaheadTracker: UnsafeMutablePointer<LookaheadTracker>) {
+    fileprivate init(
+      sourceBufferStart: Lexer.Cursor,
+      cursor: Lexer.Cursor,
+      lookaheadTracker: UnsafeMutablePointer<LookaheadTracker>
+    ) {
       self.sourceBufferStart = sourceBufferStart
       self.cursor = cursor
-      self.nextToken = self.cursor.nextToken(sourceBufferStart: self.sourceBufferStart, stateAllocator: lexerStateAllocator)
+      self.nextToken = self.cursor.nextToken(
+        sourceBufferStart: self.sourceBufferStart,
+        stateAllocator: lexerStateAllocator
+      )
       self.lookaheadTracker = lookaheadTracker
     }
 
@@ -63,7 +74,10 @@ extension Lexer {
 
     mutating func advance() -> Lexer.Lexeme {
       defer {
-        self.nextToken = self.cursor.nextToken(sourceBufferStart: self.sourceBufferStart, stateAllocator: lexerStateAllocator)
+        self.nextToken = self.cursor.nextToken(
+          sourceBufferStart: self.sourceBufferStart,
+          stateAllocator: lexerStateAllocator
+        )
       }
       self.recordNextTokenInLookaheadTracker()
       return self.nextToken
@@ -81,7 +95,10 @@ extension Lexer {
       self.cursor = currentToken.cursor
       self.cursor.position = self.cursor.position.advanced(by: offset)
 
-      self.nextToken = self.cursor.nextToken(sourceBufferStart: self.sourceBufferStart, stateAllocator: lexerStateAllocator)
+      self.nextToken = self.cursor.nextToken(
+        sourceBufferStart: self.sourceBufferStart,
+        stateAllocator: lexerStateAllocator
+      )
 
       currentToken = self.advance()
     }
@@ -94,7 +111,10 @@ extension Lexer {
       for _ in 0..<consumedPrefix {
         _ = self.cursor.advance()
       }
-      self.nextToken = self.cursor.nextToken(sourceBufferStart: self.sourceBufferStart, stateAllocator: lexerStateAllocator)
+      self.nextToken = self.cursor.nextToken(
+        sourceBufferStart: self.sourceBufferStart,
+        stateAllocator: lexerStateAllocator
+      )
       return self.advance()
     }
 
@@ -108,14 +128,18 @@ extension Lexer {
     mutating func perform(stateTransition: StateTransition, currentToken: inout Lexeme) {
       self.cursor = currentToken.cursor
       self.cursor.perform(stateTransition: stateTransition, stateAllocator: self.lexerStateAllocator)
-      self.nextToken = self.cursor.nextToken(sourceBufferStart: self.sourceBufferStart, stateAllocator: self.lexerStateAllocator)
+      self.nextToken = self.cursor.nextToken(
+        sourceBufferStart: self.sourceBufferStart,
+        stateAllocator: self.lexerStateAllocator
+      )
       currentToken = self.advance()
     }
 
     @_spi(Testing)
     public var debugDescription: String {
       let remainingText =
-        self.nextToken.debugDescription + String(syntaxText: SyntaxText(baseAddress: self.cursor.input.baseAddress, count: self.cursor.input.count))
+        self.nextToken.debugDescription
+        + String(syntaxText: SyntaxText(baseAddress: self.cursor.input.baseAddress, count: self.cursor.input.count))
       if remainingText.count > 100 {
         return remainingText.prefix(100) + "..."
       } else {

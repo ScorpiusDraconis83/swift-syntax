@@ -20,6 +20,7 @@ fileprivate let directoriesToExclude = [
   "build",
   "Inputs",
   ".build",
+  ".index-build",
   ".swift-format-build",
 ]
 
@@ -167,7 +168,7 @@ struct FormatExecutor {
       try runGitCommand("pull")
     } else {
       try FileManager.default.createDirectory(atPath: Paths.swiftFormatBuildDir.path, withIntermediateDirectories: true)
-      try runGitCommand("clone", "https://github.com/apple/swift-format.git", ".")
+      try runGitCommand("clone", "https://github.com/swiftlang/swift-format.git", ".")
       try runGitCommand("checkout", Self.swiftFormatBranch)
     }
     try runSwiftCommand("package", "update")
@@ -200,7 +201,13 @@ struct FormatExecutor {
   ///
   /// This excludes some files like generated files or test inputs.
   private func filesToFormat() -> [URL] {
-    guard let enumerator = FileManager.default.enumerator(at: Paths.packageDir.resolvingSymlinksInPath(), includingPropertiesForKeys: [], options: []) else {
+    guard
+      let enumerator = FileManager.default.enumerator(
+        at: Paths.packageDir.resolvingSymlinksInPath(),
+        includingPropertiesForKeys: [],
+        options: []
+      )
+    else {
       return []
     }
 
@@ -265,7 +272,9 @@ struct FormatExecutor {
 
   func run() throws {
     #if compiler(<5.10)
-    print("💡 You are building running the format script with Swift 5.9 or lower. Running it with SwiftPM 5.10 is about 10s faster.")
+    print(
+      "💡 You are building running the format script with Swift 5.9 or lower. Running it with SwiftPM 5.10 is about 10s faster."
+    )
     #endif
 
     try run(updateAndBuild: update)

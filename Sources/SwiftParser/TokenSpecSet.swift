@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 /// A set of `TokenSpecs`. We expect to consume one of the sets specs in the
 /// parser.
@@ -373,11 +377,10 @@ enum DeclarationModifier: TokenSpecSet {
   case reasync
   case required
   case `rethrows`
+  case sending
   case `static`
   case unowned
   case weak
-  case _resultDependsOn
-  case _resultDependsOnSelf
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
@@ -414,10 +417,9 @@ enum DeclarationModifier: TokenSpecSet {
     case TokenSpec(.required): self = .required
     case TokenSpec(.rethrows): self = .rethrows
     case TokenSpec(.static): self = .static
+    case TokenSpec(.sending): self = .sending
     case TokenSpec(.unowned): self = .unowned
     case TokenSpec(.weak): self = .weak
-    case TokenSpec(._resultDependsOn) where experimentalFeatures.contains(.nonescapableTypes): self = ._resultDependsOn
-    case TokenSpec(._resultDependsOnSelf) where experimentalFeatures.contains(.nonescapableTypes): self = ._resultDependsOnSelf
     default: return nil
     }
   }
@@ -457,10 +459,9 @@ enum DeclarationModifier: TokenSpecSet {
     case .required: return .keyword(.required)
     case .rethrows: return TokenSpec(.rethrows, recoveryPrecedence: .declKeyword)
     case .static: return .keyword(.static)
+    case .sending: return .keyword(.sending)
     case .unowned: return TokenSpec(.unowned, recoveryPrecedence: .declKeyword)
     case .weak: return TokenSpec(.weak, recoveryPrecedence: .declKeyword)
-    case ._resultDependsOn: return TokenSpec(._resultDependsOn, recoveryPrecedence: .declKeyword)
-    case ._resultDependsOnSelf: return TokenSpec(._resultDependsOnSelf, recoveryPrecedence: .declKeyword)
     }
   }
 }
@@ -483,7 +484,8 @@ enum DeclarationStart: TokenSpecSet {
   }
 
   static var allCases: [DeclarationStart] {
-    return DeclarationModifier.allCases.map(Self.declarationModifier) + DeclarationKeyword.allCases.map(Self.declarationKeyword)
+    return DeclarationModifier.allCases.map(Self.declarationModifier)
+      + DeclarationKeyword.allCases.map(Self.declarationKeyword)
   }
 
   var spec: TokenSpec {
@@ -593,7 +595,8 @@ enum OperatorLike: TokenSpecSet {
   }
 
   static var allCases: [OperatorLike] {
-    [.prefixOperator] + BinaryOperatorLike.allCases.map(Self.binaryOperatorLike) + PostfixOperatorLike.allCases.map(Self.postfixOperatorLike)
+    [.prefixOperator] + BinaryOperatorLike.allCases.map(Self.binaryOperatorLike)
+      + PostfixOperatorLike.allCases.map(Self.postfixOperatorLike)
   }
 
   var spec: TokenSpec {
@@ -636,9 +639,11 @@ enum TypeAttribute: TokenSpecSet {
   case escaping
   case noDerivative
   case noescape
+  case preconcurrency
   case retroactive
   case Sendable
   case unchecked
+  case isolated
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
@@ -652,9 +657,11 @@ enum TypeAttribute: TokenSpecSet {
     case TokenSpec(.escaping): self = .escaping
     case TokenSpec(.noDerivative): self = .noDerivative
     case TokenSpec(.noescape): self = .noescape
+    case TokenSpec(.preconcurrency): self = .preconcurrency
     case TokenSpec(.Sendable): self = .Sendable
     case TokenSpec(.retroactive): self = .retroactive
     case TokenSpec(.unchecked): self = .unchecked
+    case TokenSpec(.isolated): self = .isolated
     default: return nil
     }
   }
@@ -671,51 +678,11 @@ enum TypeAttribute: TokenSpecSet {
     case .escaping: return .keyword(.escaping)
     case .noDerivative: return .keyword(.noDerivative)
     case .noescape: return .keyword(.noescape)
+    case .preconcurrency: return .keyword(.preconcurrency)
     case .retroactive: return .keyword(.retroactive)
     case .Sendable: return .keyword(.Sendable)
     case .unchecked: return .keyword(.unchecked)
-    }
-  }
-}
-
-@_spi(Diagnostics)
-public enum TypeSpecifier: TokenSpecSet {
-  case `inout`
-  case owned
-  case shared
-  case borrowing
-  case consuming
-
-  init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
-    switch PrepareForKeywordMatch(lexeme) {
-    case TokenSpec(.inout): self = .inout
-    case TokenSpec(.__owned): self = .owned
-    case TokenSpec(.__shared): self = .shared
-    case TokenSpec(.consuming): self = .consuming
-    case TokenSpec(.borrowing): self = .borrowing
-    default: return nil
-    }
-  }
-
-  @_spi(Diagnostics)
-  public init?(token: TokenSyntax) {
-    switch token {
-    case TokenSpec(.inout): self = .inout
-    case TokenSpec(.__owned): self = .owned
-    case TokenSpec(.__shared): self = .shared
-    case TokenSpec(.consuming): self = .shared
-    case TokenSpec(.borrowing): self = .shared
-    default: return nil
-    }
-  }
-
-  var spec: TokenSpec {
-    switch self {
-    case .inout: return .keyword(.inout)
-    case .owned: return .keyword(.__owned)
-    case .shared: return .keyword(.__shared)
-    case .borrowing: return .keyword(.borrowing)
-    case .consuming: return .keyword(.consuming)
+    case .isolated: return .keyword(.isolated)
     }
   }
 }
@@ -727,11 +694,13 @@ enum ExpressionModifierKeyword: TokenSpecSet {
   case _move
   case _borrow
   case `try`
+  case borrow
   case consume
   case copy
   case `repeat`
   case each
   case any
+  case unsafe
 
   init?(lexeme: Lexer.Lexeme, experimentalFeatures: Parser.ExperimentalFeatures) {
     switch PrepareForKeywordMatch(lexeme) {
@@ -739,11 +708,13 @@ enum ExpressionModifierKeyword: TokenSpecSet {
     case TokenSpec(._move): self = ._move
     case TokenSpec(._borrow): self = ._borrow
     case TokenSpec(.try): self = .try
+    case TokenSpec(.borrow): self = .borrow
     case TokenSpec(.consume): self = .consume
     case TokenSpec(.copy): self = .copy
     case TokenSpec(.repeat): self = .repeat
     case TokenSpec(.each): self = .each
     case TokenSpec(.any): self = .any
+    case TokenSpec(.unsafe) where experimentalFeatures.contains(.unsafeExpression): self = .unsafe
     default: return nil
     }
   }
@@ -753,12 +724,14 @@ enum ExpressionModifierKeyword: TokenSpecSet {
     case .await: return .keyword(.await)
     case ._move: return .keyword(._move)
     case ._borrow: return .keyword(._borrow)
+    case .borrow: return .keyword(.borrow)
     case .consume: return .keyword(.consume)
     case .copy: return .keyword(.copy)
     case .try: return .keyword(.try)
     case .repeat: return .keyword(.repeat)
     case .each: return .keyword(.each)
     case .any: return .keyword(.any)
+    case .unsafe: return .keyword(.unsafe)
     }
   }
 }
@@ -859,6 +832,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
   case `Any`
   case atSign  // For recovery
   case `Self`
+  case `deinit`
   case dollarIdentifier
   case `false`
   case floatLiteral
@@ -876,6 +850,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
   case regexSlash
   case extendedRegexDelimiter
   case `self`
+  case `subscript`
   case `super`
   case `true`
   case wildcard
@@ -889,6 +864,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case TokenSpec(.Any): self = .Any
     case TokenSpec(.atSign): self = .atSign
     case TokenSpec(.Self): self = .Self
+    case TokenSpec(.deinit): self = .`deinit`
     case TokenSpec(.dollarIdentifier): self = .dollarIdentifier
     case TokenSpec(.false): self = .false
     case TokenSpec(.floatLiteral): self = .floatLiteral
@@ -906,6 +882,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case TokenSpec(.regexSlash): self = .regexSlash
     case TokenSpec(.regexPoundDelimiter): self = .extendedRegexDelimiter
     case TokenSpec(.self): self = .self
+    case TokenSpec(.subscript): self = .`subscript`
     case TokenSpec(.super): self = .super
     case TokenSpec(.true): self = .true
     case TokenSpec(.wildcard): self = .wildcard
@@ -922,6 +899,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case .Any: return .keyword(.Any)
     case .atSign: return .atSign
     case .Self: return .keyword(.Self)
+    case .`deinit`: return .keyword(.`deinit`)
     case .dollarIdentifier: return .dollarIdentifier
     case .false: return .keyword(.false)
     case .floatLiteral: return .floatLiteral
@@ -939,6 +917,7 @@ enum PrimaryExpressionStart: TokenSpecSet {
     case .regexSlash: return .regexSlash
     case .extendedRegexDelimiter: return .regexPoundDelimiter
     case .self: return .keyword(.self)
+    case .`subscript`: return .keyword(.subscript)
     case .super: return .keyword(.super)
     case .true: return .keyword(.true)
     case .wildcard: return .wildcard

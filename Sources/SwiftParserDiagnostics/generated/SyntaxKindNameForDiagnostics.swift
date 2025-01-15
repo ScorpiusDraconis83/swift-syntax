@@ -12,13 +12,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 extension SyntaxKind {
   var nameForDiagnostics: String? {
     switch self {
     case .token:
       return "token"
+    case .abiAttributeArguments:
+      return "ABI-providing declaration"
     case .accessorDecl:
       return "accessor"
     case .accessorEffectSpecifiers:
@@ -61,7 +67,7 @@ extension SyntaxKind {
       return "'_borrow' expression"
     case .breakStmt:
       return "'break' statement"
-    case .canImportExpr:
+    case ._canImportExpr:
       return "'canImport' expression"
     case .catchClauseList:
       return "'catch' clause"
@@ -247,6 +253,8 @@ extension SyntaxKind {
       return "labeled statement"
     case .layoutRequirement:
       return "layout requirement"
+    case .lifetimeTypeSpecifier:
+      return "lifetime specifier"
     case .macroDecl:
       return "macro"
     case .macroExpansionDecl:
@@ -333,6 +341,8 @@ extension SyntaxKind {
       return "same type requirement"
     case .simpleStringLiteralExpr:
       return "simple string literal"
+    case .simpleTypeSpecifier:
+      return "type specifier"
     case .someOrAnyType:
       return "type"
     case .sourceFile:
@@ -389,6 +399,8 @@ extension SyntaxKind {
       return "'is'"
     case .unresolvedTernaryExpr:
       return "ternary operator"
+    case .unsafeExpr:
+      return "'unsafe' expression"
     case .valueBindingPattern:
       return "value binding pattern"
     case .variableDecl:

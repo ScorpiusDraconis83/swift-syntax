@@ -9,7 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+#if compiler(>=6)
+internal import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Prefabricated operator precedence graphs.
 extension OperatorTable {
@@ -59,7 +64,7 @@ extension OperatorTable {
   /// without requiring access to the standard library source code. However,
   /// because it does not incorporate user-defined operators, it will only
   /// ever be useful for a quick approximation.
-  public static var standardOperators: OperatorTable {
+  public static let standardOperators: OperatorTable = {
     let precedenceGroups: [PrecedenceGroup] = [
       PrecedenceGroup(
         name: "AssignmentPrecedence",
@@ -432,5 +437,5 @@ extension OperatorTable {
       precedenceGroups: precedenceGroups,
       operators: operators
     )
-  }
+  }()
 }

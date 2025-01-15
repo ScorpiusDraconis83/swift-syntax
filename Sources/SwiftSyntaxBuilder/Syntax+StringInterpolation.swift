@@ -10,10 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftBasicFormat
+internal import SwiftDiagnostics
+@_spi(RawSyntax) @_spi(Testing) internal import SwiftParser
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 import SwiftBasicFormat
 import SwiftDiagnostics
 @_spi(RawSyntax) @_spi(Testing) import SwiftParser
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 /// An individual interpolated syntax node.
 struct InterpolatedSyntaxNode {
@@ -75,7 +82,7 @@ extension SyntaxStringInterpolation: StringInterpolationProtocol {
     let startIndex = sourceText.count
     let indentedNode: Node
     if let lastIndentation {
-      indentedNode = Indenter.indent(node, indentation: lastIndentation)
+      indentedNode = node.indented(by: lastIndentation)
     } else {
       indentedNode = node
     }
@@ -268,7 +275,6 @@ extension String: ExpressibleByLiteralSyntax {
 
 extension ExpressibleByLiteralSyntax where Self: BinaryInteger {
   public func makeLiteralSyntax() -> IntegerLiteralExprSyntax {
-    // TODO: Radix selection? Thousands separators?
     let digits = String(self, radix: 10)
     return IntegerLiteralExprSyntax(literal: .integerLiteral(digits))
   }
@@ -305,7 +311,6 @@ extension ExpressibleByLiteralSyntax where Self: FloatingPoint, Self: LosslessSt
       )
 
     case .negativeNormal, .negativeSubnormal, .positiveZero, .positiveSubnormal, .positiveNormal:
-      // TODO: Thousands separators?
       let digits = String(self)
       return ExprSyntax(FloatLiteralExprSyntax(literal: .floatLiteral(digits)))
     }
@@ -367,7 +372,8 @@ extension Set: ExpressibleByLiteralSyntax where Element: ExpressibleByLiteralSyn
   }
 }
 
-extension KeyValuePairs: ExpressibleByLiteralSyntax where Key: ExpressibleByLiteralSyntax, Value: ExpressibleByLiteralSyntax {
+extension KeyValuePairs: ExpressibleByLiteralSyntax
+where Key: ExpressibleByLiteralSyntax, Value: ExpressibleByLiteralSyntax {
   public func makeLiteralSyntax() -> DictionaryExprSyntax {
     DictionaryExprSyntax(leftSquare: .leftSquareToken(), rightSquare: .rightSquareToken()) {
       for elem in self {
@@ -381,7 +387,8 @@ extension KeyValuePairs: ExpressibleByLiteralSyntax where Key: ExpressibleByLite
   }
 }
 
-extension Dictionary: ExpressibleByLiteralSyntax where Key: ExpressibleByLiteralSyntax, Value: ExpressibleByLiteralSyntax {
+extension Dictionary: ExpressibleByLiteralSyntax
+where Key: ExpressibleByLiteralSyntax, Value: ExpressibleByLiteralSyntax {
   public func makeLiteralSyntax() -> DictionaryExprSyntax {
     // Dictionaries are unordered. Sort the elements by their keys' source-code representation to emit them in a stable order.
     let elemSyntaxes = map {
@@ -446,11 +453,21 @@ extension Optional: ExpressibleByLiteralSyntax where Wrapped: ExpressibleByLiter
 extension TokenSyntax: SyntaxExpressibleByStringInterpolation {
   public init(stringInterpolation: SyntaxStringInterpolation) {
     let string = stringInterpolation.sourceText.withUnsafeBufferPointer { buf in
-      return String(syntaxText: SyntaxText(buffer: buf))
+      // Technically, `buf` is not allocated in a `SyntaxArena` but it satisfies
+      // all the required properties: `buf` will always outlive any references
+      // to it.
+      let syntaxArenaBuf = SyntaxArenaAllocatedBufferPointer(buf)
+      return String(syntaxText: SyntaxText(buffer: syntaxArenaBuf))
     }
     self = .identifier(string)
   }
 }
+
+#if compiler(>=6)
+// Silence warning that TokenSyntax has a retroactive conformance to `ExpressibleByStringInterpolation` through
+// `SyntaxExpressibleByStringInterpolation`.
+extension TokenSyntax: Swift.ExpressibleByStringInterpolation {}
+#endif
 
 // MARK: - Trivia expressible as string
 
@@ -474,12 +491,16 @@ struct UnexpectedTrivia: DiagnosticMessage {
 
 }
 
-extension Trivia: ExpressibleByStringInterpolation {
+extension Trivia {
   public init(stringInterpolation: String.StringInterpolation) {
     var text = String(stringInterpolation: stringInterpolation)
     let pieces = text.withUTF8 { (buf) -> [TriviaPiece] in
+      // Technically, `buf` is not allocated in a `SyntaxArena` but it satisfies
+      // all the required properties: `buf` will always outlive any references
+      // to it.
+      let syntaxArenaBuf = SyntaxArenaAllocatedBufferPointer(buf)
       // The leading trivia position is a little bit less restrictive (it allows a shebang), so let's use it.
-      let rawPieces = TriviaParser.parseTrivia(SyntaxText(buffer: buf), position: .leading)
+      let rawPieces = TriviaParser.parseTrivia(SyntaxText(buffer: syntaxArenaBuf), position: .leading)
       return rawPieces.map { TriviaPiece.init(raw: $0) }
     }
 
@@ -492,3 +513,9 @@ extension Trivia: ExpressibleByStringInterpolation {
     self.init(stringInterpolation: interpolation)
   }
 }
+
+#if compiler(>=6)
+extension Trivia: Swift.ExpressibleByStringInterpolation {}
+#else
+extension Trivia: ExpressibleByStringInterpolation {}
+#endif

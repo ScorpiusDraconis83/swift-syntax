@@ -21,9 +21,9 @@ import SwiftSyntax
 ///    but fixed types.
 ///  - Collection nodes contains an arbitrary number of children but all those
 ///    children are of the same type.
-public class Node {
+public class Node: NodeChoiceConvertible {
   fileprivate enum Data {
-    case layout(children: [Child], traits: [String])
+    case layout(children: [Child], childHistory: Child.History, traits: [String])
     case collection(choices: [SyntaxNodeKind])
   }
 
@@ -40,8 +40,6 @@ public class Node {
   /// The kind of node’s supertype. This kind must have `isBase == true`
   public let base: SyntaxNodeKind
 
-  /// The experimental feature the node is part of, or `nil` if this isn't
-  /// for an experimental feature.
   public let experimentalFeature: ExperimentalFeature?
 
   /// When the node name is printed for diagnostics, this name is used.
@@ -57,14 +55,13 @@ public class Node {
   /// function that should be invoked to create this node.
   public let parserFunction: TokenSyntax?
 
-  /// If `true`, this is for an experimental language feature, and any public
-  /// API generated should be SPI.
-  public var isExperimental: Bool { experimentalFeature != nil }
+  public var syntaxNodeKind: SyntaxNodeKind {
+    self.kind
+  }
 
-  /// A name for this node that is suitable to be used as a variables or enum
-  /// case's name.
-  public var varOrCaseName: TokenSyntax {
-    return kind.varOrCaseName
+  /// A name for this node as an identifier.
+  public var identifier: TokenSyntax {
+    return kind.identifier
   }
 
   /// If this is a layout node, return a view of the node that provides access
@@ -113,14 +110,8 @@ public class Node {
     return attrList.with(\.trailingTrivia, attrList.isEmpty ? [] : .newline)
   }
 
-  /// The documentation note to print for an experimental feature.
-  public var experimentalDocNote: SwiftSyntax.Trivia {
-    let comment = experimentalFeature.map {
-      """
-      - Experiment: Requires experimental feature `\($0.token)`.
-      """
-    }
-    return SwiftSyntax.Trivia.docCommentTrivia(from: comment)
+  public var apiAttributes: AttributeListSyntax {
+    self.apiAttributes()
   }
 
   /// Construct the specification for a layout syntax node.
@@ -132,7 +123,8 @@ public class Node {
     documentation: String? = nil,
     parserFunction: TokenSyntax? = nil,
     traits: [String] = [],
-    children: [Child] = []
+    children: [Child] = [],
+    childHistory: Child.History = []
   ) {
     precondition(base != .syntaxCollection)
     precondition(base.isBase, "unknown base kind '\(base)' for node '\(kind)'")
@@ -144,51 +136,9 @@ public class Node {
     self.documentation = SwiftSyntax.Trivia.docCommentTrivia(from: documentation)
     self.parserFunction = parserFunction
 
-    let childrenWithUnexpected: [Child]
-    if children.isEmpty {
-      childrenWithUnexpected = [
-        Child(name: "unexpected", kind: .collection(kind: .unexpectedNodes, collectionElementName: "Unexpected"), isOptional: true)
-      ]
-    } else {
-      // Add implicitly generated UnexpectedNodes children between
-      // any two defined children
-      childrenWithUnexpected =
-        children.enumerated().flatMap { (i, child) -> [Child] in
-          let childName = child.name.withFirstCharacterUppercased
+    let childrenWithUnexpected = kind.isBase ? children : interleaveUnexpectedChildren(children)
 
-          let unexpectedName: String
-          let unexpectedDeprecatedName: String?
-
-          if i == 0 {
-            unexpectedName = "unexpectedBefore\(childName)"
-            unexpectedDeprecatedName = child.deprecatedName.map { "unexpectedBefore\($0.withFirstCharacterUppercased)" }
-          } else {
-            unexpectedName = "unexpectedBetween\(children[i - 1].name.withFirstCharacterUppercased)And\(childName)"
-            if let deprecatedName = children[i - 1].deprecatedName?.withFirstCharacterUppercased {
-              unexpectedDeprecatedName = "unexpectedBetween\(deprecatedName)And\(child.deprecatedName?.withFirstCharacterUppercased ?? childName)"
-            } else if let deprecatedName = child.deprecatedName?.withFirstCharacterUppercased {
-              unexpectedDeprecatedName = "unexpectedBetween\(children[i - 1].name.withFirstCharacterUppercased)And\(deprecatedName)"
-            } else {
-              unexpectedDeprecatedName = nil
-            }
-          }
-          let unexpectedBefore = Child(
-            name: unexpectedName,
-            deprecatedName: unexpectedDeprecatedName,
-            kind: .collection(kind: .unexpectedNodes, collectionElementName: unexpectedName),
-            isOptional: true
-          )
-          return [unexpectedBefore, child]
-        } + [
-          Child(
-            name: "unexpectedAfter\(children.last!.name.withFirstCharacterUppercased)",
-            deprecatedName: children.last!.deprecatedName.map { "unexpectedAfter\($0.withFirstCharacterUppercased)" },
-            kind: .collection(kind: .unexpectedNodes, collectionElementName: "UnexpectedAfter\(children.last!.name.withFirstCharacterUppercased)"),
-            isOptional: true
-          )
-        ]
-    }
-    self.data = .layout(children: childrenWithUnexpected, traits: traits)
+    self.data = .layout(children: childrenWithUnexpected, childHistory: childHistory, traits: traits)
   }
 
   /// A doc comment that lists all the nodes in which this node occurs as a child in.
@@ -220,13 +170,17 @@ public class Node {
     let list =
       childIn
       .map {
-        if let childName = $0.child?.varOrCaseName {
+        if let childName = $0.child?.identifier {
           // This will repeat the syntax type before and after the dot, which is
           // a little unfortunate, but it's the only way I found to get docc to
           // generate a fully-qualified type + member.
-          return " - ``\($0.node.syntaxType)``.``\($0.node.syntaxType)/\(childName)``"
+          if $0.node.isAvailableInDocc {
+            return " - \($0.node.doccLink).``\($0.node.syntaxType)/\(childName)``"
+          } else {
+            return " - \($0.node.doccLink).`\($0.node.syntaxType)/\(childName)`"
+          }
         } else {
-          return " - ``\($0.node.syntaxType)``"
+          return " - \($0.node.doccLink)"
         }
       }
       .joined(separator: "\n")
@@ -248,8 +202,8 @@ public class Node {
 
     let list =
       SYNTAX_NODES
-      .filter { $0.base == self.kind && !$0.isExperimental }
-      .map { "- ``\($0.kind.syntaxType)``" }
+      .filter { $0.base == self.kind && !$0.isExperimental && !$0.kind.isDeprecated }
+      .map { "- \($0.kind.doccLink)" }
       .joined(separator: "\n")
 
     guard !list.isEmpty else {
@@ -317,7 +271,7 @@ public struct LayoutNode {
   /// This includes unexpected children
   public var children: [Child] {
     switch node.data {
-    case .layout(children: let children, traits: _):
+    case .layout(children: let children, childHistory: _, traits: _):
       return children
     case .collection:
       preconditionFailure("NodeLayoutView must wrap a Node with data `.layout`")
@@ -329,10 +283,20 @@ public struct LayoutNode {
     return children.filter { !$0.isUnexpectedNodes }
   }
 
+  /// The history of the layout node's children.
+  public var childHistory: Child.History {
+    switch node.data {
+    case .layout(children: _, childHistory: let childHistory, traits: _):
+      return childHistory
+    case .collection:
+      preconditionFailure("NodeLayoutView must wrap a Node with data `.layout`")
+    }
+  }
+
   /// Traits that the node conforms to.
   public var traits: [String] {
     switch node.data {
-    case .layout(children: _, traits: let traits):
+    case .layout(children: _, childHistory: _, traits: let traits):
       return traits
     case .collection:
       preconditionFailure("NodeLayoutView must wrap a Node with data `.layout`")
@@ -392,9 +356,9 @@ public struct CollectionNode {
   public var grammar: SwiftSyntax.Trivia {
     let grammar: String
     if let onlyElement = elementChoices.only {
-      grammar = "``\(onlyElement.syntaxType)`` `*`"
+      grammar = "\(onlyElement.doccLink) `*`"
     } else {
-      grammar = "(\(elementChoices.map { "``\($0.syntaxType)``" }.joined(separator: " | "))) `*`"
+      grammar = "(\(elementChoices.map { "\($0.doccLink)" }.joined(separator: " | "))) `*`"
     }
 
     return .docCommentTrivia(
@@ -412,7 +376,7 @@ fileprivate extension Child {
     switch kind {
     case .node(let kind):
       return [kind]
-    case .nodeChoices(let choices):
+    case .nodeChoices(let choices, _):
       return choices.flatMap(\.kinds)
     case .collection(kind: let kind, _, _, _):
       return [kind]
@@ -422,6 +386,11 @@ fileprivate extension Child {
   }
 }
 
-fileprivate extension Node {
+fileprivate func interleaveUnexpectedChildren(_ children: [Child]) -> [Child] {
+  let liftedChildren = children.lazy.map(Optional.some)
+  let pairedChildren = zip([nil] + liftedChildren, liftedChildren + [nil])
 
+  return pairedChildren.flatMap { earlier, later in
+    [earlier, Child(forUnexpectedBetween: earlier, and: later)].compactMap { $0 }
+  }
 }

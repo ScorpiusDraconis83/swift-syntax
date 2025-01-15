@@ -10,60 +10,116 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 extension CodeBlockItemListBuilder {
   public static func buildExpression(_ expression: some ExprSyntaxProtocol) -> Component {
-    return buildExpression(CodeBlockItemSyntax(item: .expr(ExprSyntax(expression))))
+    buildExpression(CodeBlockItemSyntax(item: .expr(ExprSyntax(expression))))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<ExprSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { CodeBlockItemSyntax(item: .expr(ExprSyntax($0))) })
   }
 
   public static func buildExpression(_ expression: some StmtSyntaxProtocol) -> Component {
-    return buildExpression(CodeBlockItemSyntax(item: .stmt(StmtSyntax(expression))))
+    buildExpression(CodeBlockItemSyntax(item: .stmt(StmtSyntax(expression))))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<StmtSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { CodeBlockItemSyntax(item: .stmt(StmtSyntax($0))) })
   }
 
   public static func buildExpression(_ expression: some DeclSyntaxProtocol) -> Component {
-    return buildExpression(CodeBlockItemSyntax(item: .decl(DeclSyntax(expression))))
+    buildExpression(CodeBlockItemSyntax(item: .decl(DeclSyntax(expression))))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<DeclSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { CodeBlockItemSyntax(item: .decl(DeclSyntax($0))) })
+  }
+
+  public static func buildFinalResult(_ component: Component) -> CodeBlockItemListSyntax {
+    // Treat the first element as being on a new line. It doesn't need a leading newline
+    var previousEndedInNewline = true
+
+    return CodeBlockItemListSyntax(
+      component.map { expression in
+        defer {
+          previousEndedInNewline = expression.trailingTrivia.pieces.last?.isNewline ?? false
+        }
+        if !previousEndedInNewline, !expression.leadingTrivia.contains(where: \.isNewline) {
+          return expression.with(\.leadingTrivia, .newline.merging(expression.leadingTrivia))
+        } else {
+          return expression
+        }
+      }
+    )
   }
 }
 
 extension ConditionElementListBuilder {
   public static func buildExpression(_ expression: some ExprSyntaxProtocol) -> Component {
-    return buildExpression(ConditionElementSyntax(condition: .expression(ExprSyntax(expression))))
+    buildExpression(ConditionElementSyntax(condition: .expression(ExprSyntax(expression))))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<ExprSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { ConditionElementSyntax(condition: .expression(ExprSyntax($0))) })
   }
 
   public static func buildExpression(_ expression: AvailabilityConditionSyntax) -> Component {
-    return buildExpression(ConditionElementSyntax(condition: .availability(expression)))
+    buildExpression(ConditionElementSyntax(condition: .availability(expression)))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<AvailabilityConditionSyntax>) -> Component {
+    buildExpression(expression.map { ConditionElementSyntax(condition: .availability($0)) })
   }
 
   public static func buildExpression(_ expression: MatchingPatternConditionSyntax) -> Component {
-    return buildExpression(ConditionElementSyntax(condition: .matchingPattern(expression)))
+    buildExpression(ConditionElementSyntax(condition: .matchingPattern(expression)))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<MatchingPatternConditionSyntax>) -> Component {
+    buildExpression(expression.map { ConditionElementSyntax(condition: .matchingPattern($0)) })
   }
 
   public static func buildExpression(_ expression: OptionalBindingConditionSyntax) -> Component {
-    return buildExpression(ConditionElementSyntax(condition: .optionalBinding(expression)))
+    buildExpression(ConditionElementSyntax(condition: .optionalBinding(expression)))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<OptionalBindingConditionSyntax>) -> Component {
+    buildExpression(expression.map { ConditionElementSyntax(condition: .optionalBinding($0)) })
   }
 }
 
 extension MemberBlockItemListBuilder {
   public static func buildExpression(_ expression: some DeclSyntaxProtocol) -> Component {
-    return buildExpression(MemberBlockItemSyntax(decl: expression))
+    buildExpression(MemberBlockItemSyntax(decl: expression))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<DeclSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { MemberBlockItemSyntax(decl: $0) })
   }
 }
 
-// MARK: Initializing collections from protocols
-// These initializers allow the creation of syntax collections that have a base
-// node as their element from the corresponding protocol type.
-// These are used by the result builders.
-// Since we only have two of these, it doesn’t make sense to generate them.
+extension ExprListBuilder {
+  public static func buildExpression(_ expression: some ExprSyntaxProtocol) -> Component {
+    buildExpression(ExprSyntax(fromProtocol: expression))
+  }
 
-extension ExprListSyntax {
-  init(_ elements: [ExprSyntaxProtocol]) {
-    self = ExprListSyntax(elements.map { ExprSyntax(fromProtocol: $0) } as [ExprSyntax])
+  public static func buildExpression(_ expression: some Sequence<ExprSyntaxProtocol>) -> Component {
+    buildExpression(expression.map { ExprSyntax(fromProtocol: $0) })
   }
 }
 
-extension UnexpectedNodesSyntax {
-  public init(_ elements: [SyntaxProtocol]) {
-    self = UnexpectedNodesSyntax(elements.map { Syntax(fromProtocol: $0) } as [Syntax])
+extension UnexpectedNodesBuilder {
+  public static func buildExpression(_ expression: some SyntaxProtocol) -> Component {
+    buildExpression(Syntax(fromProtocol: expression))
+  }
+
+  public static func buildExpression(_ expression: some Sequence<SyntaxProtocol>) -> Component {
+    buildExpression(expression.map { Syntax(fromProtocol: $0) })
   }
 }

@@ -18,7 +18,7 @@ final class TypeTests: ParserTestCase {
   func testMissingColonInType() {
     assertParse(
       """
-      var foo 1️⃣Bar = 1
+      var foo1️⃣ Bar = 1
       """,
       diagnostics: [
         DiagnosticSpec(message: "expected ':' in type annotation", fixIts: ["insert ':'"])
@@ -55,7 +55,11 @@ final class TypeTests: ParserTestCase {
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected type in function type", fixIts: ["insert type"]),
         DiagnosticSpec(locationMarker: "1️⃣", message: "unexpected code '..' in function type"),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "expected return type in function type", fixIts: ["insert return type"]),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected return type in function type",
+          fixIts: ["insert return type"]
+        ),
       ],
       fixedSource: """
         t as(<#type#>..)-> <#type#>
@@ -90,8 +94,8 @@ final class TypeTests: ParserTestCase {
       diagnostics: [
         DiagnosticSpec(
           locationMarker: "1️⃣",
-          message: "expected identifier in closure capture",
-          fixIts: ["insert identifier"]
+          message: "expected closure capture in closure capture clause",
+          fixIts: ["insert closure capture"]
         ),
         DiagnosticSpec(
           locationMarker: "1️⃣",
@@ -256,8 +260,12 @@ final class TypeTests: ParserTestCase {
                 genericArgumentClause: GenericArgumentClauseSyntax(
                   arguments: GenericArgumentListSyntax([
                     GenericArgumentSyntax(
-                      argument: IdentifierTypeSyntax(
-                        name: .identifier("Foo")
+                      argument: .type(
+                        TypeSyntax(
+                          IdentifierTypeSyntax(
+                            name: .identifier("Foo")
+                          )
+                        )
                       )
                     )
                   ])
@@ -305,6 +313,109 @@ final class TypeTests: ParserTestCase {
     )
   }
 
+  func testInverseTypes() {
+    assertParse(
+      "[~Copyable]()"
+    )
+
+    assertParse(
+      "[any ~Copyable]()"
+    )
+
+    assertParse(
+      "[any P & ~Copyable]()"
+    )
+
+    assertParse(
+      "[P & ~Copyable]()"
+    )
+
+    assertParse(
+      "X<~Copyable>()"
+    )
+
+    assertParse(
+      "X<any ~Copyable>()"
+    )
+
+    assertParse(
+      "X<P & ~Copyable>()"
+    )
+
+    assertParse(
+      "X<any P & ~Copyable>()"
+    )
+  }
+
+  func testInverseTypesAsExpr() {
+    assertParse(
+      "(~Copyable).self"
+    )
+
+    assertParse(
+      "~Copyable.self"
+    )
+
+    assertParse(
+      "(any ~Copyable).self"
+    )
+  }
+
+  func testInverseTypesInParameter() {
+    assertParse(
+      "func f(_: borrowing ~Copyable) {}"
+    )
+
+    assertParse(
+      "func f(_: consuming ~Copyable) {}"
+    )
+
+    assertParse(
+      "func f(_: borrowing any ~Copyable) {}"
+    )
+
+    assertParse(
+      "func f(_: consuming any ~Copyable) {}"
+    )
+
+    assertParse(
+      "func f(_: ~Copyable) {}"
+    )
+
+    assertParse(
+      "typealias T = (~Copyable) -> Void"
+    )
+
+    assertParse(
+      "typealias T = (_ x: ~Copyable) -> Void"
+    )
+
+    assertParse(
+      "typealias T = (borrowing ~Copyable) -> Void"
+    )
+
+    assertParse(
+      "typealias T = (_ x: borrowing ~Copyable) -> Void"
+    )
+
+    assertParse(
+      "typealias T = (borrowing any ~Copyable) -> Void"
+    )
+
+    assertParse(
+      "typealias T = (_ x: borrowing any ~Copyable) -> Void"
+    )
+
+    assertParse(
+      "func f(_: any borrowing 1️⃣~Copyable) {}",
+      diagnostics: [
+        DiagnosticSpec(
+          message: "unexpected code '~Copyable' in parameter clause"
+        )
+      ]
+    )
+  }
+
   func testTypedThrows() {
     assertParse(
       """
@@ -318,6 +429,112 @@ final class TypeTests: ParserTestCase {
 
     assertParse(
       "[() throws(PosixError) -> Void]()"
+    )
+  }
+
+  func testMultipleTypeSpecifiers() {
+    assertParse("func foo1(_ a: _const borrowing String) {}")
+    assertParse("func foo2(_ a: borrowing _const String) {}")
+  }
+
+  func testLifetimeSpecifier() {
+    assertParse("func foo() -> dependsOn(x) X", experimentalFeatures: [.nonescapableTypes])
+
+    assertParse("func foo() -> dependsOn(x, y) X", experimentalFeatures: [.nonescapableTypes])
+
+    assertParse(
+      "func foo() -> dependsOn(1️⃣) X",
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected parameter reference in lifetime specifier",
+          fixIts: ["insert parameter reference"]
+        )
+      ],
+      fixedSource: "func foo() -> dependsOn(<#identifier#>) X",
+      experimentalFeatures: [.nonescapableTypes]
+    )
+
+    assertParse(
+      "func foo() -> dependsOn(x,1️⃣) X",
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected parameter reference in lifetime specifier",
+          fixIts: ["insert parameter reference"]
+        )
+      ],
+      fixedSource: "func foo() -> dependsOn(x, <#identifier#>) X",
+      experimentalFeatures: [.nonescapableTypes]
+    )
+
+    assertParse("func foo() -> dependsOn(x) dependsOn(scoped y) X", experimentalFeatures: [.nonescapableTypes])
+
+    assertParse("func foo() -> dependsOn(scoped x) X", experimentalFeatures: [.nonescapableTypes])
+
+    assertParse(
+      "func foo() -> dependsOn1️⃣ X",
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected '(', parameter reference, and ')' in lifetime specifier",
+          fixIts: ["insert '(', parameter reference, and ')'"]
+        )
+      ],
+      fixedSource: "func foo() -> dependsOn(<#identifier#>) X",
+      experimentalFeatures: [.nonescapableTypes]
+    )
+
+    assertParse(
+      "func foo() -> dependsOn(1️⃣*) X",
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "expected parameter reference in lifetime specifier",
+          fixIts: ["insert parameter reference"]
+        ),
+        DiagnosticSpec(locationMarker: "1️⃣", message: "unexpected code '*' in lifetime specifier"),
+      ],
+      fixedSource: "func foo() -> dependsOn(<#identifier#>*) X",
+      experimentalFeatures: [.nonescapableTypes]
+    )
+
+    assertParse("func foo() -> dependsOn(0) X", diagnostics: [], experimentalFeatures: [.nonescapableTypes])
+
+    assertParse("func foo() -> dependsOn(self) X", experimentalFeatures: [.nonescapableTypes])
+
+    assertParse(
+      "func foo() -> dependsOn1️⃣(0)2️⃣ X",
+      diagnostics: [
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "consecutive statements on a line must be separated by newline or ';'",
+          fixIts: ["insert newline", "insert ';'"]
+        ),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "consecutive statements on a line must be separated by newline or ';'",
+          fixIts: ["insert newline", "insert ';'"]
+        ),
+      ],
+      fixedSource: """
+        func foo() -> dependsOn
+        (0)
+        X
+        """
+    )
+
+    assertParse(
+      "func foo() -> dependsOn(1️⃣-1) X",
+      diagnostics: [
+        DiagnosticSpec(
+          message: "expected parameter reference in lifetime specifier",
+          fixIts: ["insert parameter reference"]
+        ),
+        DiagnosticSpec(message: "unexpected code '-1' in lifetime specifier"),
+      ],
+      fixedSource: "func foo() -> dependsOn(<#identifier#>-1) X",
+      experimentalFeatures: [.nonescapableTypes]
     )
   }
 }

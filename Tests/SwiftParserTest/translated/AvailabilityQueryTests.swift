@@ -31,7 +31,9 @@ final class AvailabilityQueryTests: ParserTestCase {
       if (1️⃣#available(OSX 10.51, *)) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'")
+        DiagnosticSpec(
+          message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'"
+        )
       ]
     )
   }
@@ -42,7 +44,9 @@ final class AvailabilityQueryTests: ParserTestCase {
       let x = 1️⃣#available(OSX 10.51, *)
       """,
       diagnostics: [
-        DiagnosticSpec(message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'")
+        DiagnosticSpec(
+          message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'"
+        )
       ]
     )
   }
@@ -53,7 +57,9 @@ final class AvailabilityQueryTests: ParserTestCase {
       (1️⃣#available(OSX 10.51, *) ? 1 : 0)
       """,
       diagnostics: [
-        DiagnosticSpec(message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'")
+        DiagnosticSpec(
+          message: "availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'"
+        )
       ]
     )
   }
@@ -103,7 +109,10 @@ final class AvailabilityQueryTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected ',' joining parts of a multi-clause condition", fixIts: ["replace '&&' with ','"])
+        DiagnosticSpec(
+          message: "expected ',' joining parts of a multi-clause condition",
+          fixIts: ["replace '&&' with ','"]
+        )
       ],
       fixedSource: """
         if #available(OSX 10.51, *), #available(OSX 10.52, *) {
@@ -115,7 +124,7 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery7() {
     assertParse(
       """
-      if #available 1️⃣{
+      if #available1️⃣ {
       }
       """,
       diagnostics: [
@@ -126,7 +135,7 @@ final class AvailabilityQueryTests: ParserTestCase {
         )
       ],
       fixedSource: """
-        if #available (<#identifier#>) {
+        if #available(<#identifier#>) {
         }
         """
     )
@@ -135,11 +144,14 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery8() {
     assertParse(
       """
-      if #available( 1️⃣{
+      if #available(1️⃣ {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected platform and ')' to end availability condition", fixIts: ["insert platform and ')'"])
+        DiagnosticSpec(
+          message: "expected platform and ')' to end availability condition",
+          fixIts: ["insert platform and ')'"]
+        )
       ],
       fixedSource: """
         if #available(<#identifier#>) {
@@ -155,7 +167,10 @@ final class AvailabilityQueryTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected version restriction in availability argument", fixIts: ["insert version restriction"])
+        DiagnosticSpec(
+          message: "expected version restriction in availability argument",
+          fixIts: ["insert version restriction"]
+        )
       ],
       fixedSource: """
         if #available(<#identifier#>) {
@@ -167,7 +182,7 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery10() {
     assertParse(
       """
-      if #availableℹ️(OSX 1️⃣{
+      if #availableℹ️(OSX1️⃣ {
       }
       """,
       diagnostics: [
@@ -198,7 +213,7 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery12() {
     assertParse(
       """
-      if #availableℹ️(OSX 10.51 1️⃣{
+      if #availableℹ️(OSX 10.511️⃣ {
       }
       """,
       diagnostics: [
@@ -327,7 +342,7 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery25() {
     assertParse(
       """
-      if #availableℹ️(* 1️⃣{
+      if #availableℹ️(*1️⃣ {
       }
       """,
       diagnostics: [
@@ -387,7 +402,10 @@ final class AvailabilityQueryTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected version restriction in availability argument", fixIts: ["insert version restriction"])
+        DiagnosticSpec(
+          message: "expected version restriction in availability argument",
+          fixIts: ["insert version restriction"]
+        )
       ],
       fixedSource: """
         if #available(OSX 10.51, <#identifier#>) {
@@ -399,7 +417,7 @@ final class AvailabilityQueryTests: ParserTestCase {
   func testAvailabilityQuery29() {
     assertParse(
       """
-      if #availableℹ️(OSX 10.51, iOS 1️⃣{
+      if #availableℹ️(OSX 10.51, iOS1️⃣ {
       }
       """,
       diagnostics: [
@@ -443,7 +461,10 @@ final class AvailabilityQueryTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected ',' joining platforms in availability condition", fixIts: ["replace '||' with ','"])
+        DiagnosticSpec(
+          message: "expected ',' joining platforms in availability condition",
+          fixIts: ["replace '||' with ','"]
+        )
       ],
       fixedSource: """
         if #available(OSX 10.51, iOS 8.0) {

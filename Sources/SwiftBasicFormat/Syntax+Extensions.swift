@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 extension TokenSyntax {
   /// The indentation of this token
@@ -19,7 +23,7 @@ extension TokenSyntax {
   /// find the indentation of the line this token occurs on.
   private var indentation: Trivia? {
     let previous = self.previousToken(viewMode: .sourceAccurate)
-    return ((previous?.trailingTrivia ?? []) + leadingTrivia).indentation(isOnNewline: false)
+    return ((previous?.trailingTrivia ?? []) + leadingTrivia).indentation(isOnNewline: previous == nil)
   }
 
   /// Returns the indentation of the line this token occurs on

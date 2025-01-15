@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 private func childNameForDiagnostics(_ keyPath: AnyKeyPath) -> String? {
   switch keyPath {
@@ -164,8 +168,8 @@ private func childNameForDiagnostics(_ keyPath: AnyKeyPath) -> String? {
     return "type"
   case \FunctionParameterSyntax.defaultValue:
     return "default value"
-  case \GenericParameterSyntax.eachKeyword:
-    return "parameter pack specifier"
+  case \GenericParameterSyntax.specifier:
+    return "specifier"
   case \GenericParameterSyntax.name:
     return "name"
   case \GenericParameterSyntax.inheritedType:
@@ -220,6 +224,8 @@ private func childNameForDiagnostics(_ keyPath: AnyKeyPath) -> String? {
     return "size"
   case \LayoutRequirementSyntax.alignment:
     return "alignment"
+  case \LifetimeSpecifierArgumentSyntax.parameter:
+    return "parameter reference"
   case \MacroDeclSyntax.attributes:
     return "attributes"
   case \MacroDeclSyntax.modifiers:

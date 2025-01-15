@@ -22,7 +22,10 @@ final class InvalidTests: ParserTestCase {
       func test1(1️⃣inout var x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["move 'inout' in front of type"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: "func test1(var x : inout Int) {}"
     )
@@ -34,7 +37,10 @@ final class InvalidTests: ParserTestCase {
       func test2(1️⃣inout let x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["move 'inout' in front of type"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: """
         func test2(let x : inout Int) {}
@@ -48,7 +54,10 @@ final class InvalidTests: ParserTestCase {
       func test3(f : (1️⃣inout _ x : Int) -> Void) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["move 'inout' in front of type"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: "func test3(f : (_ x : inout Int) -> Void) {}"
     )
@@ -60,7 +69,10 @@ final class InvalidTests: ParserTestCase {
       func test1s(1️⃣__shared var x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'__shared' before a parameter name is not allowed", fixIts: ["move '__shared' in front of type"])
+        DiagnosticSpec(
+          message: "'__shared' before a parameter name is not allowed",
+          fixIts: ["move '__shared' in front of type"]
+        )
       ],
       fixedSource: """
         func test1s(var x : __shared Int) {}
@@ -74,7 +86,10 @@ final class InvalidTests: ParserTestCase {
       func test2s(1️⃣__shared let x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'__shared' before a parameter name is not allowed", fixIts: ["move '__shared' in front of type"])
+        DiagnosticSpec(
+          message: "'__shared' before a parameter name is not allowed",
+          fixIts: ["move '__shared' in front of type"]
+        )
       ],
       fixedSource: """
         func test2s(let x : __shared Int) {}
@@ -88,7 +103,10 @@ final class InvalidTests: ParserTestCase {
       func test1o(1️⃣__owned var x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'__owned' before a parameter name is not allowed", fixIts: ["move '__owned' in front of type"])
+        DiagnosticSpec(
+          message: "'__owned' before a parameter name is not allowed",
+          fixIts: ["move '__owned' in front of type"]
+        )
       ],
       fixedSource: """
         func test1o(var x : __owned Int) {}
@@ -102,7 +120,10 @@ final class InvalidTests: ParserTestCase {
       func test2o(1️⃣__owned let x : Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'__owned' before a parameter name is not allowed", fixIts: ["move '__owned' in front of type"])
+        DiagnosticSpec(
+          message: "'__owned' before a parameter name is not allowed",
+          fixIts: ["move '__owned' in front of type"]
+        )
       ],
       fixedSource: """
         func test2o(let x : __owned Int) {}
@@ -114,7 +135,7 @@ final class InvalidTests: ParserTestCase {
     assertParse(
       """
       func test3() {
-        undeclared_func( 1️⃣
+        undeclared_func(1️⃣ 
       }
       """,
       diagnostics: [
@@ -179,7 +200,10 @@ final class InvalidTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "all statements inside a switch must be covered by a 'case' or 'default' label", fixIts: ["insert label"])
+        DiagnosticSpec(
+          message: "all statements inside a switch must be covered by a 'case' or 'default' label",
+          fixIts: ["insert label"]
+        )
       ],
       fixedSource: """
         switch state {
@@ -212,7 +236,11 @@ final class InvalidTests: ParserTestCase {
       }
       """#,
       diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "all statements inside a switch must be covered by a 'case' or 'default' label", fixIts: ["insert label"]),
+        DiagnosticSpec(
+          locationMarker: "1️⃣",
+          message: "all statements inside a switch must be covered by a 'case' or 'default' label",
+          fixIts: ["insert label"]
+        ),
         DiagnosticSpec(
           locationMarker: "2️⃣",
           message: "consecutive statements on a line must be separated by newline or ';'",
@@ -274,7 +302,7 @@ final class InvalidTests: ParserTestCase {
     // rdar://problem/18507467
     assertParse(
       """
-      func dℹ️(_ b: 1️⃣String 2️⃣-> 3️⃣<T>() -> T4️⃣) {}
+      func dℹ️(_ b: 1️⃣String2️⃣ -> 3️⃣<T>() -> T4️⃣) {}
       """,
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected '(' to start function type", fixIts: ["insert '('"]),
@@ -283,7 +311,11 @@ final class InvalidTests: ParserTestCase {
           message: "expected ')' in function type",
           fixIts: ["insert ')'"]
         ),
-        DiagnosticSpec(locationMarker: "3️⃣", message: "expected return type in function type", fixIts: ["insert return type"]),
+        DiagnosticSpec(
+          locationMarker: "3️⃣",
+          message: "expected return type in function type",
+          fixIts: ["insert return type"]
+        ),
         DiagnosticSpec(
           locationMarker: "3️⃣",
           message: "expected ')' to end parameter clause",
@@ -317,7 +349,7 @@ final class InvalidTests: ParserTestCase {
       do {
         class Starfish {}
         struct Salmon {}
-        func f(s 1️⃣Starfish,
+        func f(s1️⃣ Starfish,
                   _ ss: Salmon) -> [Int] {}
         func g() { f(Starfish(), Salmon()) }
       }
@@ -337,37 +369,11 @@ final class InvalidTests: ParserTestCase {
     )
   }
 
-  func testInvalid14() {
-    // https://github.com/apple/swift/issues/43313
-    assertParse(
-      """
-      do {
-        func f(_ a: Int, b: Int) {}
-        f(1, b: 2,1️⃣)
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "expected value in function call", fixIts: ["insert value"])
-      ],
-      fixedSource: """
-        do {
-          func f(_ a: Int, b: Int) {}
-          f(1, b: 2, <#expression#>)
-        }
-        """
-    )
-  }
-
   func testInvalid16a() {
-    // https://github.com/apple/swift/issues/43591
-    // Two inout crash compiler
     assertParse(
       """
       func f1_43591(a : inout 1️⃣inout Int) {}
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "unexpected 'inout' keyword in type")
-      ]
+      """
     )
   }
 
@@ -377,9 +383,12 @@ final class InvalidTests: ParserTestCase {
       func f2_43591(1️⃣inout inout b: Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout inout' before a parameter name is not allowed", fixIts: ["move 'inout inout' in front of type"])
+        DiagnosticSpec(
+          message: "'inout inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout inout' in front of type"]
+        )
       ],
-      fixedSource: "func f2_43591(b: inout Int) {}"
+      fixedSource: "func f2_43591(b: inout inout Int) {}"
     )
   }
 
@@ -400,10 +409,13 @@ final class InvalidTests: ParserTestCase {
       func f4_43591(1️⃣inout x: inout String) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["remove redundant 'inout'"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: """
-        func f4_43591(x: inout String) {}
+        func f4_43591(x: inout inout String) {}
         """
     )
   }
@@ -414,10 +426,13 @@ final class InvalidTests: ParserTestCase {
       func f5_43591(1️⃣inout i: inout Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["remove redundant 'inout'"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: """
-        func f5_43591(i: inout Int) {}
+        func f5_43591(i: inout inout Int) {}
         """
     )
   }
@@ -428,7 +443,10 @@ final class InvalidTests: ParserTestCase {
       func 1️⃣repeat() {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "keyword 'repeat' cannot be used as an identifier here", fixIts: ["if this name is unavoidable, use backticks to escape it"])
+        DiagnosticSpec(
+          message: "keyword 'repeat' cannot be used as an identifier here",
+          fixIts: ["if this name is unavoidable, use backticks to escape it"]
+        )
       ],
       fixedSource: """
         func `repeat`() {}
@@ -442,7 +460,10 @@ final class InvalidTests: ParserTestCase {
       let 1️⃣for = 2
       """,
       diagnostics: [
-        DiagnosticSpec(message: "keyword 'for' cannot be used as an identifier here", fixIts: ["if this name is unavoidable, use backticks to escape it"])
+        DiagnosticSpec(
+          message: "keyword 'for' cannot be used as an identifier here",
+          fixIts: ["if this name is unavoidable, use backticks to escape it"]
+        )
       ],
       fixedSource: """
         let `for` = 2
@@ -456,10 +477,13 @@ final class InvalidTests: ParserTestCase {
       func f4_43591(1️⃣inout x: inout String) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["remove redundant 'inout'"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
       fixedSource: """
-        func f4_43591(x: inout String) {}
+        func f4_43591(x: inout inout String) {}
         """
     )
   }
@@ -470,9 +494,12 @@ final class InvalidTests: ParserTestCase {
       func f5_43591(1️⃣inout i: inout Int) {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'inout' before a parameter name is not allowed", fixIts: ["remove redundant 'inout'"])
+        DiagnosticSpec(
+          message: "'inout' before a parameter name is not allowed",
+          fixIts: ["move 'inout' in front of type"]
+        )
       ],
-      fixedSource: "func f5_43591(i: inout Int) {}"
+      fixedSource: "func f5_43591(i: inout inout Int) {}"
     )
   }
 
@@ -482,7 +509,10 @@ final class InvalidTests: ParserTestCase {
       func 1️⃣repeat() {}
       """,
       diagnostics: [
-        DiagnosticSpec(message: "keyword 'repeat' cannot be used as an identifier here", fixIts: ["if this name is unavoidable, use backticks to escape it"])
+        DiagnosticSpec(
+          message: "keyword 'repeat' cannot be used as an identifier here",
+          fixIts: ["if this name is unavoidable, use backticks to escape it"]
+        )
       ],
       fixedSource: """
         func `repeat`() {}
@@ -496,7 +526,10 @@ final class InvalidTests: ParserTestCase {
       let 1️⃣for = 2
       """,
       diagnostics: [
-        DiagnosticSpec(message: "keyword 'for' cannot be used as an identifier here", fixIts: ["if this name is unavoidable, use backticks to escape it"])
+        DiagnosticSpec(
+          message: "keyword 'for' cannot be used as an identifier here",
+          fixIts: ["if this name is unavoidable, use backticks to escape it"]
+        )
       ],
       fixedSource: """
         let `for` = 2
@@ -505,91 +538,91 @@ final class InvalidTests: ParserTestCase {
   }
 
   func testInvalid23() {
-    let testCases: [UInt: (fixIt: String, fixedSource: String)] = [
-      #line: ("join the identifiers together", "func dogcow() {}"),
-      #line: ("join the identifiers together with camel-case", "func dogCow() {}"),
-    ]
-
-    for (line, testCase) in testCases {
-      assertParse(
-        """
-        func dog 1️⃣cow() {}
-        """,
-        diagnostics: [
-          DiagnosticSpec(
-            message: "found an unexpected second identifier in function; is there an accidental break?",
-            fixIts: [
-              "join the identifiers together",
-              "join the identifiers together with camel-case",
-            ]
-          )
-        ],
-        applyFixIts: [testCase.fixIt],
-        fixedSource: testCase.fixedSource,
-        line: line
-      )
-    }
+    assertParse(
+      """
+      func dog 1️⃣cow() {}
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "found an unexpected second identifier in function; is there an accidental break?",
+          fixIts: [
+            "join the identifiers together",
+            "join the identifiers together with camel-case",
+          ]
+        )
+      ],
+      fixItsApplications: [
+        .optIn(
+          applyFixIts: ["join the identifiers together"],
+          fixedSource: "func dogcow() {}"
+        ),
+        .optIn(
+          applyFixIts: ["join the identifiers together with camel-case"],
+          fixedSource: "func dogCow() {}"
+        ),
+      ]
+    )
   }
 
   func testThreeIdentifersForFunctionName() {
-    let testCases: [UInt: (fixIt: String, fixedSource: String)] = [
-      #line: ("join the identifiers together", "func dogcowsheep() {}"),
-      #line: ("join the identifiers together with camel-case", "func dogCowSheep() {}"),
-    ]
-
-    for (line, testCase) in testCases {
-      assertParse(
-        """
-        func dog 1️⃣cow sheep() {}
-        """,
-        diagnostics: [
-          DiagnosticSpec(
-            message: "found an unexpected second identifier in function; is there an accidental break?",
-            fixIts: [
-              "join the identifiers together",
-              "join the identifiers together with camel-case",
-            ]
-          )
-        ],
-        applyFixIts: [testCase.fixIt],
-        fixedSource: testCase.fixedSource,
-        line: line
-      )
-    }
+    assertParse(
+      """
+      func dog 1️⃣cow sheep() {}
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "found an unexpected second identifier in function; is there an accidental break?",
+          fixIts: [
+            "join the identifiers together",
+            "join the identifiers together with camel-case",
+          ]
+        )
+      ],
+      fixItsApplications: [
+        .optIn(
+          applyFixIts: ["join the identifiers together"],
+          fixedSource: "func dogcowsheep() {}"
+        ),
+        .optIn(
+          applyFixIts: ["join the identifiers together with camel-case"],
+          fixedSource: "func dogCowSheep() {}"
+        ),
+      ]
+    )
   }
 
   func testInvalid25() {
-    let testCases: [UInt: (fixIt: String, fixedSource: String)] = [
-      #line: ("join the identifiers together", "func friendship<T>(x: T) {}"),
-      #line: ("join the identifiers together with camel-case", "func friendShip<T>(x: T) {}"),
-    ]
-
-    for (line, testCase) in testCases {
-      assertParse(
-        """
-        func friend 1️⃣ship<T>(x: T) {}
-        """,
-        diagnostics: [
-          DiagnosticSpec(
-            message: "found an unexpected second identifier in function; is there an accidental break?",
-            fixIts: [
-              "join the identifiers together",
-              "join the identifiers together with camel-case",
-            ]
-          )
-        ],
-        applyFixIts: [testCase.fixIt],
-        fixedSource: testCase.fixedSource,
-        line: line
-      )
-    }
+    assertParse(
+      """
+      func friend 1️⃣ship<T>(x: T) {}
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "found an unexpected second identifier in function; is there an accidental break?",
+          fixIts: [
+            "join the identifiers together",
+            "join the identifiers together with camel-case",
+          ]
+        )
+      ],
+      fixItsApplications: [
+        .optIn(
+          applyFixIts: ["join the identifiers together"],
+          fixedSource: "func friendship<T>(x: T) {}"
+        ),
+        .optIn(
+          applyFixIts: ["join the identifiers together with camel-case"],
+          fixedSource: "func friendShip<T>(x: T) {}"
+        ),
+      ]
+    )
   }
 
   func testInvalid26() {
     assertParse(
       """
       func were1️⃣
-      wolf2️⃣() 3️⃣{}
+      wolf2️⃣()3️⃣ {}
       """,
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected '(' to start parameter clause", fixIts: ["insert '('"]),
@@ -611,7 +644,11 @@ final class InvalidTests: ParserTestCase {
       """,
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "expected '(' to start parameter clause", fixIts: ["insert '('"]),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "expected ':' and type in parameter", fixIts: ["insert ':' and type"]),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: "expected ':' and type in parameter",
+          fixIts: ["insert ':' and type"]
+        ),
         DiagnosticSpec(locationMarker: "2️⃣", message: "expected ')' to end parameter clause", fixIts: ["insert ')'"]),
         DiagnosticSpec(locationMarker: "2️⃣", message: "unexpected code '<T>(x: T)' in function"),
       ],
@@ -639,7 +676,10 @@ final class InvalidTests: ParserTestCase {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "'class' constraint can only appear on protocol declarations", fixIts: ["replace 'class' with 'AnyObject'"])
+        DiagnosticSpec(
+          message: "'class' constraint can only appear on protocol declarations",
+          fixIts: ["replace 'class' with 'AnyObject'"]
+        )
       ],
       fixedSource: """
         struct Weak<T: AnyObject> {

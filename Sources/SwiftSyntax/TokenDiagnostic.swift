@@ -13,14 +13,14 @@
 /// If the token has an error that's inherent to the token itself and not its
 /// surrounding structure, this defines the type of the error.
 /// `byteOffset` specifies at which offset the error occurred.
-public struct TokenDiagnostic: Hashable {
-  public enum Severity: Comparable {
+public struct TokenDiagnostic: Hashable, Sendable {
+  public enum Severity: Comparable, Sendable {
     case warning
     case error
   }
 
   /// Each diagnostic kind is uniquely represented by a value in this enum.
-  public enum Kind {
+  public enum Kind: Sendable {
     // Please order these alphabetically
 
     case editorPlaceholder
@@ -30,6 +30,10 @@ public struct TokenDiagnostic: Hashable {
     case expectedDigitInFloatLiteral
     case expectedHexCodeInUnicodeEscape
     case expectedHexDigitInHexLiteral
+    case extraneousLeadingWhitespaceError
+    case extraneousLeadingWhitespaceWarning
+    case extraneousTrailingWhitespaceError
+    case extraneousTrailingWhitespaceWarning
     case insufficientIndentationInMultilineStringLiteral
     case invalidBinaryDigitInIntegerLiteral
     case invalidCharacter
@@ -65,6 +69,10 @@ public struct TokenDiagnostic: Hashable {
       case .expectedDigitInFloatLiteral: return .error
       case .expectedHexCodeInUnicodeEscape: return .error
       case .expectedHexDigitInHexLiteral: return .error
+      case .extraneousLeadingWhitespaceError: return .error
+      case .extraneousLeadingWhitespaceWarning: return .warning
+      case .extraneousTrailingWhitespaceError: return .error
+      case .extraneousTrailingWhitespaceWarning: return .warning
       case .insufficientIndentationInMultilineStringLiteral: return .error
       case .invalidBinaryDigitInIntegerLiteral: return .error
       case .invalidCharacter: return .error
@@ -121,8 +129,8 @@ public struct TokenDiagnostic: Hashable {
   /// expect to hit this case most of the time.
   public init(_ kind: Kind, byteOffset: Int) {
     precondition(byteOffset >= 0)
-    // `type(of: self.byteOffset).max` gets optimized to a constant
-    if byteOffset > type(of: self.byteOffset).max {
+    // `UInt16.max` gets optimized to a constant
+    if byteOffset > UInt16.max {
       self.kind = .tokenDiagnosticOffsetOverflow
       self.byteOffset = 0
     } else {

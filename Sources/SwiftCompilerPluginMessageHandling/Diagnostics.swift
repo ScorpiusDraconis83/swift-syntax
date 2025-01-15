@@ -10,8 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftDiagnostics
+internal import SwiftSyntax
+#else
 import SwiftDiagnostics
 import SwiftSyntax
+#endif
 
 /// Errors in macro handing.
 enum MacroExpansionError {
@@ -54,6 +59,9 @@ extension PluginMessage.Diagnostic.Severity {
     case .warning: self = .warning
     case .note: self = .note
     case .remark: self = .remark
+    #if RESILIENT_LIBRARIES
+    @unknown default: fatalError()
+    #endif
     }
   }
 }
@@ -122,8 +130,15 @@ extension PluginMessage.Diagnostic {
               to: .afterTrailingTrivia
             )
             text = newTrivia.description
+          case .replaceChild(let replaceChildData):
+            range = sourceManager.range(replaceChildData.replacementRange, in: replaceChildData.parent)
+            text = replaceChildData.newChild.description
+          #if RESILIENT_LIBRARIES
+          @unknown default:
+            fatalError()
+          #endif
           }
-          guard let range = range else {
+          guard let range else {
             return nil
           }
           return .init(

@@ -9,7 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+#if compiler(>=6)
+internal import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 /// Maintains and validates information about all operators in a Swift program.
 ///
@@ -19,7 +24,7 @@ import SwiftSyntax
 /// semantic representation, validating the correctness of those declarations,
 /// and "folding" sequence expression syntax into a structured expression
 /// syntax tree.
-public struct OperatorTable {
+public struct OperatorTable: Sendable {
   var precedenceGraph: PrecedenceGraph = .init()
   var infixOperators: [OperatorName: Operator] = [:]
   var prefixOperators: [OperatorName: Operator] = [:]

@@ -19,7 +19,7 @@ import XCTest
 ///
 /// Most tests are expressed by a single function call that compares the
 /// run-time String value against the parsed node's `representedLiteralValue`.
-public class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
+class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
 
   func testIntro() {
     test(
@@ -252,7 +252,10 @@ public class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
   func testMissingQuoteStringLiteral() throws {
     var parser = Parser(#""a"#)
     let stringLiteral = StringLiteralExprSyntax(ExprSyntax.parse(from: &parser))!
-    XCTAssertNil(stringLiteral.representedLiteralValue, "only fully parsed string literals should produce a literal value")
+    XCTAssertNil(
+      stringLiteral.representedLiteralValue,
+      "only fully parsed string literals should produce a literal value"
+    )
   }
 
   func testInterpolatedStringLiteral() throws {
@@ -263,7 +266,10 @@ public class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
   func testMalformedMultiLineStringLiteral() throws {
     var parser = Parser(#""""a""""#)
     let stringLiteral = StringLiteralExprSyntax(ExprSyntax.parse(from: &parser))!
-    XCTAssertNil(stringLiteral.representedLiteralValue, "missing newline in multiline string literal cannot produce a literal value")
+    XCTAssertNil(
+      stringLiteral.representedLiteralValue,
+      "missing newline in multiline string literal cannot produce a literal value"
+    )
   }
 
   // MARK: supporting code
@@ -273,7 +279,7 @@ public class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
   /// node it parses the contents of this source file and matches the literal by
   /// position in source.
   func test(_ expected: StaticString, file: StaticString = #filePath, line: UInt = #line) {
-    guard let literal = Self.literals[at: line] else {
+    guard let literal = literals[at: line] else {
       fatalError("string literal not found at line \(line)")
     }
 
@@ -285,7 +291,7 @@ public class StringLiteralRepresentedLiteralValueTests: ParserTestCase {
     XCTAssertEqual(representedLiteralValue, expected.description, file: file, line: line)
   }
 
-  static let literals = try! StringLiteralCollector()
+  let literals = try! StringLiteralCollector()
 
   /// Helper class to find string literals in this source file
   class StringLiteralCollector: SyntaxVisitor {

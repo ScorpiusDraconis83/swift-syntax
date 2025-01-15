@@ -16,7 +16,15 @@ import SyntaxSupport
 import Utils
 
 let isLexerClassifiedFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    public import SwiftSyntax
+    #else
+    import SwiftSyntax
+    #endif
+    """
+  )
 
   try! ExtensionDeclSyntax(
     """
@@ -33,7 +41,7 @@ let isLexerClassifiedFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
       try! SwitchExprSyntax("switch self") {
         for keyword in Keyword.allCases {
           if keyword.spec.isLexerClassified {
-            SwitchCaseSyntax("case .\(keyword.spec.varOrCaseName): return true")
+            SwitchCaseSyntax("case .\(keyword.spec.enumCaseCallName): return true")
           }
         }
         SwitchCaseSyntax("default: return false")

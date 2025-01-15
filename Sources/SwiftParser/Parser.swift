@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 /// A parser for the Swift programming language.
 ///
@@ -117,6 +121,9 @@ public struct Parser {
   /// Parser should own a ``LookaheadTracker`` so that we can share one `furthestOffset` in a parse.
   let lookaheadTrackerOwner: LookaheadTrackerOwner
 
+  /// The Swift version as which this source file should be parsed.
+  let swiftVersion: SwiftVersion
+
   /// The experimental features that have been enabled.
   let experimentalFeatures: ExperimentalFeatures
 
@@ -129,15 +136,23 @@ public struct Parser {
   static let defaultMaximumNestingLevel = 256
   #endif
 
+  /// The Swift version as which source files should be parsed if no Swift version is explicitly specified in the parser.
+  static let defaultSwiftVersion: SwiftVersion = .v6
+
   var _emptyRawMultipleTrailingClosureElementListSyntax: RawMultipleTrailingClosureElementListSyntax?
 
   /// Create an empty collection of the given type.
   ///
   /// These empty collections are only created once and the same node is returned
   /// on subsequent calls, reducing memory usage.
-  mutating func emptyCollection(_: RawMultipleTrailingClosureElementListSyntax.Type) -> RawMultipleTrailingClosureElementListSyntax {
+  mutating func emptyCollection(
+    _: RawMultipleTrailingClosureElementListSyntax.Type
+  ) -> RawMultipleTrailingClosureElementListSyntax {
     if _emptyRawMultipleTrailingClosureElementListSyntax == nil {
-      _emptyRawMultipleTrailingClosureElementListSyntax = RawMultipleTrailingClosureElementListSyntax(elements: [], arena: self.arena)
+      _emptyRawMultipleTrailingClosureElementListSyntax = RawMultipleTrailingClosureElementListSyntax(
+        elements: [],
+        arena: self.arena
+      )
     }
     return _emptyRawMultipleTrailingClosureElementListSyntax!
   }
@@ -168,6 +183,19 @@ public struct Parser {
     return _emptyRawAttributeListSyntax!
   }
 
+  var _emptyRawTypeSpecifierListSyntax: RawTypeSpecifierListSyntax?
+
+  /// Create an empty collection of the given type.
+  ///
+  /// These empty collections are only created once and the same node is returned
+  /// on subsequent calls, reducing memory usage.
+  mutating func emptyCollection(_: RawTypeSpecifierListSyntax.Type) -> RawTypeSpecifierListSyntax {
+    if _emptyRawTypeSpecifierListSyntax == nil {
+      _emptyRawTypeSpecifierListSyntax = RawTypeSpecifierListSyntax(elements: [], arena: self.arena)
+    }
+    return _emptyRawTypeSpecifierListSyntax!
+  }
+
   /// The delegated initializer for the parser.
   ///
   /// - Parameters
@@ -187,12 +215,15 @@ public struct Parser {
   ///            arena is created automatically, and `input` copied into the
   ///            arena. If non-`nil`, `input` must be within its registered
   ///            source buffer or allocator.
+  ///  - swiftVersion: The version of Swift using which the file should be parsed.
+  ///                  Defaults to the latest version.
   ///  - experimentalFeatures: The experimental features enabled for the parser.
   private init(
     buffer input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int?,
     parseTransition: IncrementalParseTransition?,
     arena: ParsingSyntaxArena?,
+    swiftVersion: SwiftVersion?,
     experimentalFeatures: ExperimentalFeatures
   ) {
     var input = input
@@ -200,13 +231,12 @@ public struct Parser {
       self.arena = arena
       precondition(arena.contains(text: SyntaxText(baseAddress: input.baseAddress, count: input.count)))
     } else {
-      self.arena = ParsingSyntaxArena(
-        parseTriviaFunction: TriviaParser.parseTrivia(_:position:)
-      )
+      self.arena = ParsingSyntaxArena(parseTriviaFunction: TriviaParser.parseTrivia)
       input = self.arena.internSourceBuffer(input)
     }
 
     self.maximumNestingLevel = maximumNestingLevel ?? Self.defaultMaximumNestingLevel
+    self.swiftVersion = swiftVersion ?? Self.defaultSwiftVersion
     self.experimentalFeatures = experimentalFeatures
     self.lookaheadTrackerOwner = LookaheadTrackerOwner()
 
@@ -224,6 +254,7 @@ public struct Parser {
     string input: String,
     maximumNestingLevel: Int?,
     parseTransition: IncrementalParseTransition?,
+    swiftVersion: SwiftVersion?,
     experimentalFeatures: ExperimentalFeatures
   ) {
     var input = input
@@ -234,6 +265,7 @@ public struct Parser {
         maximumNestingLevel: maximumNestingLevel,
         parseTransition: parseTransition,
         arena: nil,
+        swiftVersion: swiftVersion,
         experimentalFeatures: experimentalFeatures
       )
     }
@@ -243,13 +275,15 @@ public struct Parser {
   public init(
     _ input: String,
     maximumNestingLevel: Int? = nil,
-    parseTransition: IncrementalParseTransition? = nil
+    parseTransition: IncrementalParseTransition? = nil,
+    swiftVersion: SwiftVersion? = nil
   ) {
     // Chain to the private String initializer.
     self.init(
       string: input,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
+      swiftVersion: swiftVersion,
       experimentalFeatures: []
     )
   }
@@ -269,22 +303,19 @@ public struct Parser {
   ///                          if this is `nil`.
   ///   - parseTransition: The previously recorded state for an incremental
   ///                      parse, or `nil`.
-  ///   - arena: Arena the parsing syntax are made into. If it's `nil`, a new
-  ///            arena is created automatically, and `input` copied into the
-  ///            arena. If non-`nil`, `input` must be within its registered
-  ///            source buffer or allocator.
   public init(
     _ input: UnsafeBufferPointer<UInt8>,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
-    arena: ParsingSyntaxArena? = nil
+    swiftVersion: SwiftVersion? = nil
   ) {
     // Chain to the private buffer initializer.
     self.init(
       buffer: input,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
-      arena: arena,
+      arena: nil,
+      swiftVersion: swiftVersion,
       experimentalFeatures: []
     )
   }
@@ -296,6 +327,7 @@ public struct Parser {
     _ input: String,
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
+    swiftVersion: SwiftVersion? = nil,
     experimentalFeatures: ExperimentalFeatures
   ) {
     // Chain to the private String initializer.
@@ -303,6 +335,7 @@ public struct Parser {
       string: input,
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
+      swiftVersion: swiftVersion,
       experimentalFeatures: experimentalFeatures
     )
   }
@@ -315,6 +348,7 @@ public struct Parser {
     maximumNestingLevel: Int? = nil,
     parseTransition: IncrementalParseTransition? = nil,
     arena: ParsingSyntaxArena? = nil,
+    swiftVersion: SwiftVersion? = nil,
     experimentalFeatures: ExperimentalFeatures
   ) {
     // Chain to the private buffer initializer.
@@ -323,6 +357,7 @@ public struct Parser {
       maximumNestingLevel: maximumNestingLevel,
       parseTransition: parseTransition,
       arena: arena,
+      swiftVersion: swiftVersion,
       experimentalFeatures: experimentalFeatures
     )
   }
@@ -473,11 +508,11 @@ extension Parser {
   mutating func eat(_ handle: RecoveryConsumptionHandle) -> (RawUnexpectedNodesSyntax?, Token) {
     let unexpectedNodes: RawUnexpectedNodesSyntax?
     if handle.unexpectedTokens > 0 {
-      var unexpectedTokens = [RawSyntax]()
+      var unexpectedTokens = [RawTokenSyntax]()
       for _ in 0..<handle.unexpectedTokens {
-        unexpectedTokens.append(RawSyntax(self.consumeAnyTokenWithoutAdjustingNestingLevel()))
+        unexpectedTokens.append(self.consumeAnyTokenWithoutAdjustingNestingLevel())
       }
-      unexpectedNodes = RawUnexpectedNodesSyntax(elements: unexpectedTokens, arena: self.arena)
+      unexpectedNodes = RawUnexpectedNodesSyntax(unexpectedTokens, arena: self.arena)
     } else {
       unexpectedNodes = nil
     }
@@ -645,19 +680,22 @@ extension Parser {
       return (nil, self.consumeAnyToken(remapping: .identifier))
     }
     if allowSelfOrCapitalSelfAsIdentifier,
-      let selfOrCapitalSelf = self.consume(if: TokenSpec(.self, remapping: .identifier), TokenSpec(.Self, remapping: .identifier))
+      let selfOrCapitalSelf = self.consume(
+        if: TokenSpec(.self, remapping: .identifier),
+        TokenSpec(.Self, remapping: .identifier)
+      )
     {
       return (nil, selfOrCapitalSelf)
     }
     if let unknown = self.consume(if: .unknown) {
       return (
-        RawUnexpectedNodesSyntax(elements: [RawSyntax(unknown)], arena: self.arena),
+        RawUnexpectedNodesSyntax([unknown], arena: self.arena),
         self.missingToken(.identifier)
       )
     }
     if let number = self.consume(if: .integerLiteral, .floatLiteral, .dollarIdentifier) {
       return (
-        RawUnexpectedNodesSyntax(elements: [RawSyntax(number)], arena: self.arena),
+        RawUnexpectedNodesSyntax([number], arena: self.arena),
         self.missingToken(.identifier)
       )
     } else if keywordRecovery,
@@ -666,7 +704,7 @@ extension Parser {
     {
       let keyword = self.consumeAnyToken()
       return (
-        RawUnexpectedNodesSyntax(elements: [RawSyntax(keyword)], arena: self.arena),
+        RawUnexpectedNodesSyntax([keyword], arena: self.arena),
         self.missingToken(.identifier)
       )
     }
@@ -681,7 +719,10 @@ extension Parser {
   /// That way, if the developer forgot to to type `{`, we won't eat `}` that were most likely intended to close an outer scope.
   ///
   /// If `leftBrace` is present or `introducer` is `nil`, this is equivalent to `self.expect(.rightBrace)`.
-  mutating func expectRightBrace(leftBrace: RawTokenSyntax, introducer: RawTokenSyntax?) -> (unexpected: RawUnexpectedNodesSyntax?, token: RawTokenSyntax) {
+  mutating func expectRightBrace(
+    leftBrace: RawTokenSyntax,
+    introducer: RawTokenSyntax?
+  ) -> (unexpected: RawUnexpectedNodesSyntax?, token: RawTokenSyntax) {
     func indentation(_ pieces: [RawTriviaPiece]) -> RawTriviaPiece? {
       if pieces.last?.isNewline == true {
         return .spaces(0)
@@ -780,6 +821,24 @@ extension Parser {
   }
 }
 
+// MARK: Marking Tokens As Missing
+extension Parser {
+  private class TokenMissingMaker: SyntaxRewriter {
+    override func visit(_ token: TokenSyntax) -> TokenSyntax {
+      TokenSyntax(token.tokenKind, presence: .missing)
+    }
+  }
+
+  /// Creates a replicate of `syntax` with all tokens marked as missing.
+  func withAllTokensMarkedMissing<T: RawSyntaxNodeProtocol>(syntax: T) -> T {
+    let tokenMissingMaker = TokenMissingMaker(arena: self.arena)
+    let allMissing = tokenMissingMaker.rewrite(
+      Syntax(raw: RawSyntax(syntax), rawNodeArena: self.arena)
+    ).raw
+    return allMissing.cast(T.self)
+  }
+}
+
 extension SyntaxText {
   func withBuffer<Result>(_ body: (UnsafeBufferPointer<UInt8>) throws -> Result) rethrows -> Result {
     try body(UnsafeBufferPointer<UInt8>(start: self.baseAddress, count: self.count))
@@ -800,8 +859,10 @@ extension Parser {
   ) -> (unexpected: RawUnexpectedNodesSyntax?, period: RawTokenSyntax, skipMemberName: Bool) {
     precondition(self.at(.period))
 
-    let beforePeriodWhitespace = previousNode?.raw.trailingTriviaByteLength ?? 0 > 0 || self.currentToken.leadingTriviaByteLength > 0
-    let afterPeriodWhitespace = self.currentToken.trailingTriviaByteLength > 0 || self.peek().leadingTriviaByteLength > 0
+    let beforePeriodWhitespace =
+      previousNode?.raw.trailingTriviaByteLength ?? 0 > 0 || self.currentToken.leadingTriviaByteLength > 0
+    let afterPeriodWhitespace =
+      self.currentToken.trailingTriviaByteLength > 0 || self.peek().leadingTriviaByteLength > 0
     let afterContainsAnyNewline = self.peek().isAtStartOfLine
 
     let period = self.consumeAnyToken()
@@ -814,7 +875,7 @@ extension Parser {
     // Invalid, extraneous whitespace. Have callers synthesize a missing
     // member if there's a newline after the period.
     return (
-      RawUnexpectedNodesSyntax(elements: [period.raw], arena: arena),
+      RawUnexpectedNodesSyntax([period], arena: arena),
       RawTokenSyntax(missing: .period, arena: arena),
       afterContainsAnyNewline
     )
@@ -850,7 +911,7 @@ class LookaheadTrackerOwner {
 }
 
 /// Record the lookahead ranges for syntax nodes.
-public struct LookaheadRanges {
+public struct LookaheadRanges: Sendable {
   /// For each node that is recorded for re-use, the number of UTF-8 bytes that the parser looked ahead to parse the node, measured from the start of the node’s leading trivia.
   ///
   /// This information can be used to determine whether a node can be reused in incremental parse. A node can only be re-used if no byte in its looked range has changed.

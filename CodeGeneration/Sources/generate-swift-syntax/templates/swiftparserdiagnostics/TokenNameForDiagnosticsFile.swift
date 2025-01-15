@@ -16,19 +16,42 @@ import SyntaxSupport
 import Utils
 
 let tokenNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("@_spi(RawSyntax) import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    @_spi(RawSyntax) internal import SwiftSyntax
+    #else
+    @_spi(RawSyntax) import SwiftSyntax
+    #endif
+    """
+  )
 
   try! ExtensionDeclSyntax("extension TokenKind") {
     try! VariableDeclSyntax("var nameForDiagnostics: String") {
       try! SwitchExprSyntax("switch self") {
         for tokenSpec in Token.allCases.map(\.spec) where tokenSpec.kind != .keyword {
-          SwitchCaseSyntax("case .\(tokenSpec.varOrCaseName):") {
+          SwitchCaseSyntax("case .\(tokenSpec.enumCaseCallName):") {
             StmtSyntax("return \(literal: tokenSpec.nameForDiagnostics)")
           }
         }
         SwitchCaseSyntax("case .keyword(let keyword):") {
           StmtSyntax("return String(syntaxText: keyword.defaultText)")
         }
+        IfConfigDeclSyntax(
+          clauses: IfConfigClauseListSyntax {
+            IfConfigClauseSyntax(
+              poundKeyword: .poundIfToken(),
+              condition: ExprSyntax("RESILIENT_LIBRARIES"),
+              elements: .switchCases(
+                SwitchCaseListSyntax {
+                  SwitchCaseSyntax("@unknown default:") {
+                    StmtSyntax("fatalError()")
+                  }
+                }
+              )
+            )
+          }
+        )
       }
     }
   }

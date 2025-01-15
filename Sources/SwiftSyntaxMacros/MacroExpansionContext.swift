@@ -10,9 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftDiagnostics
+public import SwiftSyntax
+import SwiftSyntaxBuilder
+#else
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxBuilder
+#endif
 
 /// Interface to extract information about the context in which a given
 /// macro is expanded.
@@ -47,6 +53,23 @@ public protocol MacroExpansionContext: AnyObject {
     at position: PositionInSyntaxNode,
     filePathMode: SourceLocationFilePathMode
   ) -> AbstractSourceLocation?
+
+  /// Return an array of enclosing lexical contexts for the purpose of macros,
+  /// starting from the syntax node at which the macro expansion occurs
+  /// and containing all "context" nodes including functions, closures, types,
+  /// properties, subscripts, and extensions.
+  ///
+  /// Lexical contexts will have many of their details stripped out to prevent
+  /// macros from having visibility into unrelated code. For example, functions
+  /// and closures have their bodies removed, types and extensions have their
+  /// member lists emptied, and properties and subscripts have their accessor
+  /// blocks removed.
+  ///
+  /// The first entry in the array is the innermost context. For attached
+  /// macros, this is often the declaration to which the macro is attached.
+  /// This array can be empty if there is no context, for example when a
+  /// freestanding macro is used at file scope.
+  var lexicalContext: [Syntax] { get }
 }
 
 extension MacroExpansionContext {
@@ -64,16 +87,38 @@ extension MacroExpansionContext {
   ) -> AbstractSourceLocation? {
     return location(of: node, at: .afterLeadingTrivia, filePathMode: .fileID)
   }
+
+  #if compiler(>=6.0)
+  @available(*, deprecated, message: "`MacroExpansionContext` conformance must implement `lexicalContext`")
+  public var lexicalContext: [Syntax] {
+    return []
+  }
+  #else
+  public var lexicalContext: [Syntax] {
+    fatalError(
+      "`MacroExpansionContext` conformance must implement `lexicalContext`"
+    )
+  }
+  #endif
 }
 
-/// Diagnostic message used for thrown errors.
-private struct ThrownErrorDiagnostic: DiagnosticMessage {
-  let message: String
+private enum MacroExpansionContextError: DiagnosticMessage {
+  case internalError(SyntaxStringInterpolationInvalidNodeTypeError)
+  case missingError
+
+  var message: String {
+    switch self {
+    case .internalError(let error):
+      return "Internal macro error: \(error.description)"
+    case .missingError:
+      return "macro expansion failed without generating an error"
+    }
+  }
 
   var severity: DiagnosticSeverity { .error }
 
   var diagnosticID: MessageID {
-    .init(domain: "SwiftSyntaxMacros", id: "ThrownErrorDiagnostic")
+    .init(domain: "SwiftDiagnostics", id: "MacroExpansionContextError")
   }
 }
 
@@ -82,15 +127,15 @@ extension MacroExpansionContext {
   public func addDiagnostics(from error: Error, node: some SyntaxProtocol) {
     // Inspect the error to form an appropriate set of diagnostics.
     var diagnostics: [Diagnostic]
-    if let diagnosticsError = error as? DiagnosticsError {
-      diagnostics = diagnosticsError.diagnostics
-    } else if let message = error as? DiagnosticMessage {
-      diagnostics = [Diagnostic(node: Syntax(node), message: message)]
-    } else if let error = error as? SyntaxStringInterpolationInvalidNodeTypeError {
-      let diagnostic = Diagnostic(node: Syntax(node), message: ThrownErrorDiagnostic(message: "Internal macro error: \(error.description)"))
+
+    if let error = error as? SyntaxStringInterpolationInvalidNodeTypeError {
+      let diagnostic = Diagnostic(
+        node: Syntax(node),
+        message: MacroExpansionContextError.internalError(error)
+      )
       diagnostics = [diagnostic]
     } else {
-      diagnostics = [Diagnostic(node: Syntax(node), message: ThrownErrorDiagnostic(message: String(describing: error)))]
+      diagnostics = error.asDiagnostics(at: node)
     }
 
     // Emit the diagnostics.
@@ -105,9 +150,7 @@ extension MacroExpansionContext {
       diagnose(
         Diagnostic(
           node: Syntax(node),
-          message: ThrownErrorDiagnostic(
-            message: "macro expansion failed without generating an error"
-          )
+          message: MacroExpansionContextError.missingError
         )
       )
     }

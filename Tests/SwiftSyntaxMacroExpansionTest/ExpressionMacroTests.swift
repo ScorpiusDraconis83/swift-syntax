@@ -30,10 +30,50 @@ fileprivate struct StringifyMacro: ExpressionMacro {
     in context: some MacroExpansionContext
   ) throws -> ExprSyntax {
     guard let argument = macro.arguments.first?.expression else {
-      throw MacroExpansionErrorMessage("missing argument")
+      throw SwiftSyntaxMacros.MacroExpansionErrorMessage("missing argument")
     }
 
     return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
+  }
+}
+
+private struct InfiniteRecursionMacro: ExpressionMacro {
+  static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    if let i = node.arguments.first?.expression.as(IntegerLiteralExprSyntax.self)?.representedLiteralValue {
+      return "\(raw: i) + #infiniteRecursion(i: \(raw: i + 1))"
+    } else {
+      return "#nested1"
+    }
+  }
+}
+
+private struct Nested1RecursionMacro: ExpressionMacro {
+  static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    "(#nested2, #nested3, #infiniteRecursion(i: 1), #infiniteRecursion)"
+  }
+}
+
+private struct Nested2RecursionMacro: ExpressionMacro {
+  static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    "(#nested3, #nested3)"
+  }
+}
+
+private struct Nested3RecursionMacro: ExpressionMacro {
+  static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    "0"
   }
 }
 
@@ -167,7 +207,7 @@ final class ExpressionMacroTests: XCTestCase {
         in context: some MacroExpansionContext
       ) throws -> ExprSyntax {
         guard let sourceLoc: AbstractSourceLocation = context.location(of: macro) else {
-          throw MacroExpansionErrorMessage("can't find location for macro")
+          throw SwiftSyntaxMacros.MacroExpansionErrorMessage("can't find location for macro")
         }
         return sourceLoc.column
       }
@@ -179,7 +219,7 @@ final class ExpressionMacroTests: XCTestCase {
         in context: some MacroExpansionContext
       ) throws -> ExprSyntax {
         guard let sourceLoc: AbstractSourceLocation = context.location(of: macro) else {
-          throw MacroExpansionErrorMessage("can't find location for macro")
+          throw SwiftSyntaxMacros.MacroExpansionErrorMessage("can't find location for macro")
         }
         return sourceLoc.file
       }
@@ -290,6 +330,33 @@ final class ExpressionMacroTests: XCTestCase {
         DiagnosticSpec(message: "MyError()", line: 3, column: 9, severity: .error)
       ],
       macros: ["test": DiagnoseFirstArgument.self]
+    )
+  }
+
+  func testDetectCircularExpansion() {
+    assertMacroExpansion(
+      "#nested1",
+      expandedSource: "((0, 0), 0, 1 + #infiniteRecursion(i: 2), #nested1)",
+      diagnostics: [
+        DiagnosticSpec(
+          message:
+            "recursive expansion of macro 'InfiniteRecursionMacro'",
+          line: 1,
+          column: 5
+        ),
+        DiagnosticSpec(
+          message:
+            "recursive expansion of macro 'Nested1RecursionMacro'",
+          line: 1,
+          column: 1
+        ),
+      ],
+      macros: [
+        "nested1": Nested1RecursionMacro.self,
+        "nested2": Nested2RecursionMacro.self,
+        "nested3": Nested3RecursionMacro.self,
+        "infiniteRecursion": InfiniteRecursionMacro.self,
+      ]
     )
   }
 }

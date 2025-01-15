@@ -28,7 +28,7 @@ final class MultiRoleMacroTests: XCTestCase {
   private let indentationWidth: Trivia = .spaces(2)
 
   func testContextUniqueLocalNames() {
-    let context = BasicMacroExpansionContext()
+    let context = BasicMacroExpansionContext(lexicalContext: [])
 
     let t1 = context.makeUniqueName("mine")
     let t2 = context.makeUniqueName("mine")
@@ -126,6 +126,7 @@ final class MultiRoleMacroTests: XCTestCase {
       static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
+        conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
       ) throws -> [DeclSyntax] {
         return ["var _storage: Wrapper<Self>"]
@@ -208,15 +209,20 @@ final class MultiRoleMacroTests: XCTestCase {
 
   func testAttachedMacroOnFreestandingMacro() {
     struct DeclMacro: DeclarationMacro {
-      static func expansion(of node: some FreestandingMacroExpansionSyntax, in context: some MacroExpansionContext) throws -> [DeclSyntax] {
+      static func expansion(
+        of node: some FreestandingMacroExpansionSyntax,
+        in context: some MacroExpansionContext
+      ) throws -> [DeclSyntax] {
         return ["var x: Int"]
       }
     }
 
     struct MyPeerMacro: PeerMacro {
-      static func expansion(of node: AttributeSyntax, providingPeersOf declaration: some DeclSyntaxProtocol, in context: some MacroExpansionContext) throws
-        -> [DeclSyntax]
-      {
+      static func expansion(
+        of node: AttributeSyntax,
+        providingPeersOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+      ) throws -> [DeclSyntax] {
         return ["var peer: Int"]
       }
     }

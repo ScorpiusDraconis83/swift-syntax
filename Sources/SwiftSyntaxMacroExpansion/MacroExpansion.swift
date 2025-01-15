@@ -10,11 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+import SwiftBasicFormat
+public import SwiftSyntax
+@_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) public import SwiftSyntaxMacros
+#else
 import SwiftBasicFormat
 import SwiftSyntax
 @_spi(MacroExpansion) @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+#endif
 
-public enum MacroRole {
+public enum MacroRole: Sendable {
   case expression
   case declaration
   case accessor
@@ -57,6 +63,7 @@ enum MacroExpansionError: Error, CustomStringConvertible {
   case noFreestandingMacroRoles(Macro.Type)
   case moreThanOneBodyMacro
   case preambleWithoutBody
+  case recursiveExpansion(any Macro.Type)
 
   var description: String {
     switch self {
@@ -86,6 +93,9 @@ enum MacroExpansionError: Error, CustomStringConvertible {
 
     case .preambleWithoutBody:
       return "preamble macro cannot be applied to a function with no body"
+
+    case .recursiveExpansion(let type):
+      return "recursive expansion of macro '\(type)'"
     }
   }
 }
@@ -121,8 +131,10 @@ public func expandFreestandingMacro(
       if let expansionDecl = node.as(MacroExpansionDeclSyntax.self) {
         // Strip any indentation from the attributes and modifiers that we are
         // inheriting. The expanded macro should start at the leftmost column.
-        let attributes = declMacroDef.propagateFreestandingMacroAttributes ? expansionDecl.attributes.withIndentationRemoved : nil
-        let modifiers = declMacroDef.propagateFreestandingMacroModifiers ? expansionDecl.modifiers.withIndentationRemoved : nil
+        let attributes =
+          declMacroDef.propagateFreestandingMacroAttributes ? expansionDecl.attributes.withIndentationRemoved : nil
+        let modifiers =
+          declMacroDef.propagateFreestandingMacroModifiers ? expansionDecl.modifiers.withIndentationRemoved : nil
         rewritten = rewritten.map {
           $0.applying(attributes: attributes, modifiers: modifiers)
         }
@@ -139,7 +151,8 @@ public func expandFreestandingMacro(
       let rewritten = try codeItemMacroDef.expansion(of: node, in: context)
       expandedSyntax = Syntax(CodeBlockItemListSyntax(rewritten))
 
-    case (.accessor, _), (.memberAttribute, _), (.member, _), (.peer, _), (.conformance, _), (.extension, _), (.expression, _), (.declaration, _),
+    case (.accessor, _), (.memberAttribute, _), (.member, _), (.peer, _), (.conformance, _), (.extension, _),
+      (.expression, _), (.declaration, _),
       (.codeItem, _), (.preamble, _), (.body, _):
       throw MacroExpansionError.unmatchedMacroRole(definition, macroRole)
     }
@@ -304,7 +317,9 @@ public func expandAttachedMacroWithoutCollapsing<Context: MacroExpansionContext>
       }
 
     case (let attachedMacro as PreambleMacro.Type, .preamble):
-      guard let declToPass = Syntax(declarationNode).asProtocol(SyntaxProtocol.self) as? (DeclSyntaxProtocol & WithOptionalCodeBlockSyntax)
+      guard
+        let declToPass = Syntax(declarationNode).asProtocol(SyntaxProtocol.self)
+          as? (DeclSyntaxProtocol & WithOptionalCodeBlockSyntax)
       else {
         // Compiler error: declaration must have a body.
         throw MacroExpansionError.declarationHasNoBody
@@ -320,7 +335,9 @@ public func expandAttachedMacroWithoutCollapsing<Context: MacroExpansionContext>
       }
 
     case (let attachedMacro as BodyMacro.Type, .body):
-      guard let declToPass = Syntax(declarationNode).asProtocol(SyntaxProtocol.self) as? (DeclSyntaxProtocol & WithOptionalCodeBlockSyntax)
+      guard
+        let declToPass = Syntax(declarationNode).asProtocol(SyntaxProtocol.self)
+          as? (DeclSyntaxProtocol & WithOptionalCodeBlockSyntax)
       else {
         // Compiler error: declaration must have a body.
         throw MacroExpansionError.declarationHasNoBody
@@ -381,23 +398,41 @@ public func expandAttachedMacro<Context: MacroExpansionContext>(
     in: context,
     indentationWidth: indentationWidth
   )
-  return expandedSources.map {
-    collapse(expansions: $0, for: macroRole, attachedTo: declarationNode, indentationWidth: indentationWidth)
+  if let expandedSources {
+    // If formatting is disabled we don't want to add any indentation while collapsing
+    let collapseIndentationWidth: Trivia?
+    switch definition.formatMode {
+    case .auto: collapseIndentationWidth = indentationWidth
+    case .disabled: collapseIndentationWidth = []
+    #if RESILIENT_LIBRARIES
+    @unknown default: fatalError()
+    #endif
+    }
+    return collapse(
+      expansions: expandedSources,
+      for: macroRole,
+      attachedTo: declarationNode,
+      indentationWidth: collapseIndentationWidth
+    )
   }
+  return nil
 }
 
 fileprivate extension SyntaxProtocol {
   /// Perform a format if required and then trim any leading/trailing
   /// whitespace.
   func formattedExpansion(_ mode: FormatMode, indentationWidth: Trivia?) -> String {
-    let formatted: Syntax
     switch mode {
     case .auto:
-      formatted = self.formatted(using: BasicFormat(indentationWidth: indentationWidth))
+      return self.formatted(using: BasicFormat(indentationWidth: indentationWidth))
+        .trimmedDescription(matching: \.isWhitespace)
     case .disabled:
-      formatted = Syntax(self)
+      return Syntax(self).description
+    #if RESILIENT_LIBRARIES
+    @unknown default:
+      fatalError()
+    #endif
     }
-    return formatted.trimmedDescription(matching: { $0.isWhitespace })
   }
 }
 
@@ -496,5 +531,15 @@ public func collapse<Node: SyntaxProtocol>(
     break
   }
 
-  return expansions.joined(separator: separator)
+  // Join the expansions ensuring `separator` between them.
+  var collapsed = ""
+  for expansion in expansions {
+    if collapsed.isEmpty || expansion.hasPrefix(separator) {
+      collapsed.append(expansion)
+    } else {
+      collapsed.append(separator + expansion)
+    }
+  }
+
+  return collapsed
 }

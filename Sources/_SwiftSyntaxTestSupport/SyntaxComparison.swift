@@ -10,12 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Utility APIs to compare two difference syntax trees for structual
+// Utility APIs to compare two difference syntax trees for structural
 // equivalence.
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftSyntax
+#else
 import SwiftSyntax
+#endif
 
 public enum DifferenceReason {
   case nodeType, presence, missingNode, additionalNode, trivia, token
@@ -86,10 +90,10 @@ extension TreeDifference: CustomDebugStringConvertible {
   }
 }
 
-public extension SyntaxProtocol {
+extension SyntaxProtocol {
   /// Compares the current tree against a `baseline`, returning the first
   /// difference it finds.
-  func findFirstDifference(baseline: some SyntaxProtocol, includeTrivia: Bool = false) -> TreeDifference? {
+  public func findFirstDifference(baseline: some SyntaxProtocol, includeTrivia: Bool = false) -> TreeDifference? {
     if let reason = isDifferent(baseline: baseline, includeTrivia: includeTrivia) {
       return TreeDifference(node: self, baseline: baseline, reason: reason)
     }
@@ -125,7 +129,10 @@ public extension SyntaxProtocol {
         if token.tokenKind != baselineToken.tokenKind {
           return .token
         }
-        if includeTrivia && (token.leadingTrivia != baselineToken.leadingTrivia || token.trailingTrivia != baselineToken.trailingTrivia) {
+        if includeTrivia
+          && (token.leadingTrivia != baselineToken.leadingTrivia
+            || token.trailingTrivia != baselineToken.trailingTrivia)
+        {
           return .trivia
         }
       }

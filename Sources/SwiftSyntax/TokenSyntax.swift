@@ -40,6 +40,11 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
     self._syntaxNode = Syntax(node)
   }
 
+  @_transparent
+  init(unsafeCasting node: Syntax) {
+    self._syntaxNode = node
+  }
+
   /// Construct a new token with the given `kind`, `leadingTrivia`,
   /// `trailingTrivia` and `presence`.
   public init(
@@ -57,7 +62,7 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       tokenDiagnostic: nil,
       arena: arena
     )
-    self = Syntax.forRoot(raw, rawNodeArena: arena).cast(TokenSyntax.self)
+    self = Syntax.forRoot(raw, rawNodeArena: RetainedSyntaxArena(arena)).cast(TokenSyntax.self)
   }
 
   /// Whether the token is present or missing.
@@ -111,7 +116,9 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
       }
       let arena = SyntaxArena()
       let newRaw = tokenView.withKind(newValue, arena: arena)
-      self = Syntax(self).replacingSelf(newRaw, rawNodeArena: arena, allocationArena: arena).cast(TokenSyntax.self)
+      self = Syntax(self)
+        .replacingSelf(newRaw, rawNodeArena: RetainedSyntaxArena(arena), allocationArena: arena)
+        .cast(TokenSyntax.self)
     }
   }
 
@@ -141,13 +148,13 @@ public struct TokenSyntax: SyntaxProtocol, SyntaxHashable {
     return raw.totalLength
   }
 
-  /// Whether the token text is an editor placeholder or not.
-  public var isEditorPlaceholder: Bool {
+  /// An identifier created from `self`.
+  public var identifier: Identifier? {
     switch self.tokenKind {
-    case .identifier(let text):
-      return text.hasPrefix("<#") && text.hasSuffix("#>")
+    case .identifier, .dollarIdentifier:
+      return Identifier(self)
     default:
-      return false
+      return nil
     }
   }
 

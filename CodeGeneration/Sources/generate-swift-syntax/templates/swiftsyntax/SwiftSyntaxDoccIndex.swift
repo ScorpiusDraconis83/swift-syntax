@@ -37,7 +37,10 @@ let nodesSections: String = {
 
   for (baseKind, heading) in nodeKinds {
     let baseTypes = ["\(baseKind.syntaxType)", "\(baseKind.syntaxType)Protocol", "Missing\(baseKind.syntaxType)"]
-    let leafTypes = SYNTAX_NODES.filter({ $0.base == baseKind && !$0.kind.isMissing && !$0.isExperimental }).map(\.kind.syntaxType.description)
+    let leafTypes =
+      SYNTAX_NODES
+      .filter({ $0.base == baseKind && !$0.kind.isMissing && !$0.isExperimental && !$0.kind.isDeprecated })
+      .map(\.kind.syntaxType.description)
     addSection(heading: heading, types: baseTypes + leafTypes)
   }
 
@@ -53,48 +56,29 @@ let nodesSections: String = {
         }
         return [node.kind.syntaxType.description]
           + node.elementChoices
-          .filter { SYNTAX_NODE_MAP[$0] != nil }
+          .filter { SYNTAX_NODE_MAP[$0] != nil && !SYNTAX_NODE_MAP[$0]!.isExperimental && !$0.isDeprecated }
           .map(\.syntaxType.description)
           .filter { !handledSyntaxTypes.contains($0) }
       })
   )
 
-  addSection(heading: "Attributes", types: ATTRIBUTE_NODES.filter({ !$0.isExperimental }).map(\.kind.syntaxType.description).sorted())
+  addSection(
+    heading: "Attributes",
+    types: ATTRIBUTE_NODES.filter({ !$0.isExperimental && !$0.kind.isDeprecated }).map(\.kind.syntaxType.description)
+      .sorted()
+  )
 
   addSection(
     heading: "Miscellaneous Syntax",
-    types: SYNTAX_NODES.filter({ !$0.isExperimental }).map(\.kind.syntaxType.description).filter({ !handledSyntaxTypes.contains($0) })
+    types: SYNTAX_NODES.filter({ !$0.isExperimental && !$0.kind.isDeprecated }).map(\.kind.syntaxType.description)
+      .filter({
+        !handledSyntaxTypes.contains($0)
+      })
   )
 
   addSection(heading: "Traits", types: TRAITS.map { "\($0.protocolName)" })
 
   return result
-}()
-
-var contributingDocs: String = {
-  let contributingDocsFolder = URL(fileURLWithPath: #filePath)
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .appendingPathComponent("Sources")
-    .appendingPathComponent("SwiftSyntax")
-    .appendingPathComponent("Documentation.docc")
-    .appendingPathComponent("Contributing")
-
-  let files = (try? FileManager.default.contentsOfDirectory(at: contributingDocsFolder, includingPropertiesForKeys: nil)) ?? []
-
-  return files.compactMap { file in
-    if file.pathExtension != "md" {
-      return nil
-    }
-    let doccName = file.lastPathComponent
-      .replacingOccurrences(of: ".md", with: "")
-      .replacingOccurrences(of: " ", with: "-")
-    return "- <doc:\(doccName)>"
-  }.sorted().joined(separator: "\n")
 }()
 
 let swiftSyntaxDoccIndex: String = {
@@ -106,5 +90,4 @@ let swiftSyntaxDoccIndex: String = {
   return
     template
     .replacingOccurrences(of: "{{Nodes}}", with: nodesSections)
-    .replacingOccurrences(of: "{{ContributingDocs}}", with: contributingDocs)
 }()

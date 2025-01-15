@@ -106,7 +106,10 @@ final class IfconfigExprTests: ParserTestCase {
       """#,
       diagnostics: [
         DiagnosticSpec(locationMarker: "1️⃣", message: "unexpected code '+ otherExpr' in conditional compilation block"),
-        DiagnosticSpec(locationMarker: "2️⃣", message: #"unexpected code 'print("debug")' in conditional compilation block"#),
+        DiagnosticSpec(
+          locationMarker: "2️⃣",
+          message: #"unexpected code 'print("debug")' in conditional compilation block"#
+        ),
       ]
     )
   }
@@ -262,10 +265,7 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, _version: 2.2.2.21️⃣.2)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "trailing components of version 2.2.2.2 are ignored", severity: .warning)
-      ]
+      """
     )
   }
 
@@ -315,23 +315,17 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, 1️⃣unknown: 2.2)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "2nd parameter of canImport should be labeled as _version or _underlyingVersion")
-      ]
+      """
     )
   }
 
   func testIfconfigExpr23() {
     assertParse(
       """
-      #if canImport(A,1️⃣)
+      #if canImport(A,)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "2nd parameter of canImport should be labeled as _version or _underlyingVersion")
-      ]
+      """
     )
   }
 
@@ -341,10 +335,7 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, 1️⃣2.2)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "2nd parameter of canImport should be labeled as _version or _underlyingVersion")
-      ]
+      """
     )
   }
 
@@ -354,11 +345,7 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, 1️⃣2.22️⃣, 1.1)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(locationMarker: "1️⃣", message: "2nd parameter of canImport should be labeled as _version or _underlyingVersion"),
-        DiagnosticSpec(locationMarker: "2️⃣", message: "canImport can take only two parameters"),
-      ]
+      """
     )
   }
 
@@ -370,10 +357,10 @@ final class IfconfigExprTests: ParserTestCase {
       #endif
       """,
       diagnostics: [
-        DiagnosticSpec(message: "expected version tuple in 'canImport' expression", fixIts: ["insert version tuple"])
+        DiagnosticSpec(message: "expected value in function call", fixIts: ["insert value"])
       ],
       fixedSource: """
-        #if canImport(A, _version: <#integer literal#>)
+        #if canImport(A, _version: <#expression#>)
           let a = 1
         #endif
         """
@@ -386,10 +373,7 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, _version: 1️⃣"")
         let a = 1
       #endif
-      """#,
-      diagnostics: [
-        DiagnosticSpec(message: #"cannot parse version component code '""'"#)
-      ]
+      """#
     )
   }
 
@@ -399,22 +383,19 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, _version: 1️⃣>=2.2)
         let a = 1
       #endif
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "cannot parse version component code '>=2.2'")
-      ]
+      """
     )
   }
 
   func testIfconfigExpr29() {
     assertParse(
       """
-      #if canImport(A, _version: 1️⃣20A301)
+      #if canImport(A, _version: 201️⃣A301)
         let a = 1
       #endif
       """,
       diagnostics: [
-        DiagnosticSpec(message: "cannot parse version component code '20A301'")
+        DiagnosticSpec(message: "'A' is not a valid digit in integer literal")
       ]
     )
   }
@@ -425,10 +406,7 @@ final class IfconfigExprTests: ParserTestCase {
       #if canImport(A, _version: 1️⃣"20A301")
         let a = 1
       #endif
-      """#,
-      diagnostics: [
-        DiagnosticSpec(message: #"cannot parse version component code '"20A301"'"#)
-      ]
+      """#
     )
   }
 
@@ -445,7 +423,8 @@ final class IfconfigExprTests: ParserTestCase {
       """,
       diagnostics: [
         DiagnosticSpec(
-          message: "unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?",
+          message:
+            "unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?",
           fixIts: ["replace '#else if' with '#elseif'"]
         )
       ],
@@ -500,7 +479,6 @@ final class IfconfigExprTests: ParserTestCase {
     )
   }
 
-  // FIXME: Diagnostics could be better.
   func testIfConfigExpr34() {
     assertParse(
       """
@@ -719,6 +697,15 @@ final class IfconfigExprTests: ParserTestCase {
         ),
         elements: .init(CodeBlockItemListSyntax([]))
       )
+    )
+  }
+
+  func testCanImportWithStringVersion() {
+    assertParse(
+      """
+      #if canImport(MyModule, _version: "1.2.3")
+      #endif
+      """
     )
   }
 }

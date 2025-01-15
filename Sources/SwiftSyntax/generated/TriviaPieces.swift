@@ -20,7 +20,7 @@
 ///
 /// In general, you should deal with the actual Trivia collection instead
 /// of individual pieces whenever possible.
-public enum TriviaPiece {
+public enum TriviaPiece: Sendable {
   /// A backslash that is at the end of a line in a multi-line string literal to escape the newline.
   case backslashes(Int)
   /// A developer block comment, starting with '/*' and ending with '*/'.
@@ -31,11 +31,11 @@ public enum TriviaPiece {
   case carriageReturnLineFeeds(Int)
   /// A documentation block comment, starting with '/**' and ending with '*/'.
   case docBlockComment(String)
-  /// A documentation line comment, starting with '///'.
+  /// A documentation line comment, starting with '///' and excluding the trailing newline.
   case docLineComment(String)
   /// A form-feed 'f' character.
   case formfeeds(Int)
-  /// A developer line comment, starting with '//'
+  /// A developer line comment, starting with '//' and excluding the trailing newline.
   case lineComment(String)
   /// A newline '\n' character.
   case newlines(Int)
@@ -55,29 +55,29 @@ extension TriviaPiece: TextOutputStreamable {
   /// Prints the provided trivia as they would be written in a source file.
   ///
   /// - Parameter stream: The stream to which to print the trivia.
-  public func write(to target: inout some TextOutputStream) {
+  public func write(to stream: inout some TextOutputStream) {
     func printRepeated(_ character: String, count: Int) {
       for _ in 0 ..< count {
-        target.write(character)
+        stream.write(character)
       }
     }
     switch self {
     case let .backslashes(count):
       printRepeated(#"\"#, count: count)
     case let .blockComment(text):
-      target.write(text)
+      stream.write(text)
     case let .carriageReturns(count):
       printRepeated("\r", count: count)
     case let .carriageReturnLineFeeds(count):
       printRepeated("\r\n", count: count)
     case let .docBlockComment(text):
-      target.write(text)
+      stream.write(text)
     case let .docLineComment(text):
-      target.write(text)
+      stream.write(text)
     case let .formfeeds(count):
       printRepeated("\u{c}", count: count)
     case let .lineComment(text):
-      target.write(text)
+      stream.write(text)
     case let .newlines(count):
       printRepeated("\n", count: count)
     case let .pounds(count):
@@ -87,7 +87,7 @@ extension TriviaPiece: TextOutputStreamable {
     case let .tabs(count):
       printRepeated("\t", count: count)
     case let .unexpectedText(text):
-      target.write(text)
+      stream.write(text)
     case let .verticalTabs(count):
       printRepeated("\u{b}", count: count)
     }
@@ -135,112 +135,112 @@ extension Trivia {
   public static func backslashes(_ count: Int) -> Trivia {
     return [.backslashes(count)]
   }
-  
+
   /// Gets a piece of trivia for #"\"# characters.
   public static var backslash: Trivia {
     return .backslashes(1)
   }
-  
+
   /// Returns a piece of trivia for BlockComment.
   public static func blockComment(_ text: String) -> Trivia {
     return [.blockComment(text)]
   }
-  
+
   /// Returns a piece of trivia for some number of "\r" characters.
   public static func carriageReturns(_ count: Int) -> Trivia {
     return [.carriageReturns(count)]
   }
-  
+
   /// Gets a piece of trivia for "\r" characters.
   public static var carriageReturn: Trivia {
     return .carriageReturns(1)
   }
-  
+
   /// Returns a piece of trivia for some number of "\r\n" characters.
   public static func carriageReturnLineFeeds(_ count: Int) -> Trivia {
     return [.carriageReturnLineFeeds(count)]
   }
-  
+
   /// Gets a piece of trivia for "\r\n" characters.
   public static var carriageReturnLineFeed: Trivia {
     return .carriageReturnLineFeeds(1)
   }
-  
+
   /// Returns a piece of trivia for DocBlockComment.
   public static func docBlockComment(_ text: String) -> Trivia {
     return [.docBlockComment(text)]
   }
-  
+
   /// Returns a piece of trivia for DocLineComment.
   public static func docLineComment(_ text: String) -> Trivia {
     return [.docLineComment(text)]
   }
-  
+
   /// Returns a piece of trivia for some number of "\u{c}" characters.
   public static func formfeeds(_ count: Int) -> Trivia {
     return [.formfeeds(count)]
   }
-  
+
   /// Gets a piece of trivia for "\u{c}" characters.
   public static var formfeed: Trivia {
     return .formfeeds(1)
   }
-  
+
   /// Returns a piece of trivia for LineComment.
   public static func lineComment(_ text: String) -> Trivia {
     return [.lineComment(text)]
   }
-  
+
   /// Returns a piece of trivia for some number of "\n" characters.
   public static func newlines(_ count: Int) -> Trivia {
     return [.newlines(count)]
   }
-  
+
   /// Gets a piece of trivia for "\n" characters.
   public static var newline: Trivia {
     return .newlines(1)
   }
-  
+
   /// Returns a piece of trivia for some number of "#" characters.
   public static func pounds(_ count: Int) -> Trivia {
     return [.pounds(count)]
   }
-  
+
   /// Gets a piece of trivia for "#" characters.
   public static var pound: Trivia {
     return .pounds(1)
   }
-  
+
   /// Returns a piece of trivia for some number of " " characters.
   public static func spaces(_ count: Int) -> Trivia {
     return [.spaces(count)]
   }
-  
+
   /// Gets a piece of trivia for " " characters.
   public static var space: Trivia {
     return .spaces(1)
   }
-  
+
   /// Returns a piece of trivia for some number of "\t" characters.
   public static func tabs(_ count: Int) -> Trivia {
     return [.tabs(count)]
   }
-  
+
   /// Gets a piece of trivia for "\t" characters.
   public static var tab: Trivia {
     return .tabs(1)
   }
-  
+
   /// Returns a piece of trivia for UnexpectedText.
   public static func unexpectedText(_ text: String) -> Trivia {
     return [.unexpectedText(text)]
   }
-  
+
   /// Returns a piece of trivia for some number of "\u{b}" characters.
   public static func verticalTabs(_ count: Int) -> Trivia {
     return [.verticalTabs(count)]
   }
-  
+
   /// Gets a piece of trivia for "\u{b}" characters.
   public static var verticalTab: Trivia {
     return .verticalTabs(1)
@@ -289,7 +289,7 @@ extension TriviaPiece {
 /// In contrast to ``TriviaPiece``, a ``RawTriviaPiece`` does not own the source
 /// text of the trivia.
 @_spi(RawSyntax)
-public enum RawTriviaPiece: Equatable {
+public enum RawTriviaPiece: Equatable, Sendable {
   case backslashes(Int)
   case blockComment(SyntaxText)
   case carriageReturns(Int)
@@ -304,7 +304,7 @@ public enum RawTriviaPiece: Equatable {
   case tabs(Int)
   case unexpectedText(SyntaxText)
   case verticalTabs(Int)
-  
+
   static func make(_ piece: TriviaPiece, arena: SyntaxArena) -> RawTriviaPiece {
     switch piece {
     case let .backslashes(count):
@@ -407,7 +407,7 @@ extension RawTriviaPiece {
       return count
     }
   }
-  
+
   var storedText: SyntaxText? {
     switch self {
     case .backslashes(_):
@@ -447,7 +447,7 @@ extension TriviaPiece {
   public var isWhitespace: Bool {
     return isSpaceOrTab || isNewline
   }
-  
+
   public var isNewline: Bool {
     switch self {
     case .carriageReturns:
@@ -464,12 +464,22 @@ extension TriviaPiece {
       return false
     }
   }
-  
+
   public var isSpaceOrTab: Bool {
     switch self {
     case .spaces:
       return true
     case .tabs:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` if this piece is a comment.
+  public var isComment: Bool {
+    switch self {
+    case .lineComment, .blockComment, .docLineComment, .docBlockComment:
       return true
     default:
       return false
@@ -482,7 +492,7 @@ extension RawTriviaPiece {
   public var isWhitespace: Bool {
     return isSpaceOrTab || isNewline
   }
-  
+
   public var isNewline: Bool {
     switch self {
     case .carriageReturns:
@@ -499,12 +509,22 @@ extension RawTriviaPiece {
       return false
     }
   }
-  
+
   public var isSpaceOrTab: Bool {
     switch self {
     case .spaces:
       return true
     case .tabs:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Returns `true` if this piece is a comment.
+  public var isComment: Bool {
+    switch self {
+    case .lineComment, .blockComment, .docLineComment, .docBlockComment:
       return true
     default:
       return false

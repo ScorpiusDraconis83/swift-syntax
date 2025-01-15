@@ -10,9 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+public import SwiftDiagnostics
+@_spi(Diagnostics) internal import SwiftParser
+@_spi(RawSyntax) public import SwiftSyntax
+#else
 import SwiftDiagnostics
 @_spi(Diagnostics) import SwiftParser
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 fileprivate let diagnosticDomain: String = "SwiftLexer"
 
@@ -21,17 +27,36 @@ public protocol TokenError: DiagnosticMessage {
   var diagnosticID: MessageID { get }
 }
 
-public extension TokenError {
-  static var diagnosticID: MessageID {
+extension TokenError {
+  public static var diagnosticID: MessageID {
     return MessageID(domain: diagnosticDomain, id: "\(self)")
   }
 
-  var diagnosticID: MessageID {
+  public var diagnosticID: MessageID {
     return Self.diagnosticID
   }
 
-  var severity: DiagnosticSeverity {
+  public var severity: DiagnosticSeverity {
     return .error
+  }
+}
+
+/// A warning diagnostic whose ID is determined by the diagnostic's type.
+public protocol TokenWarning: DiagnosticMessage {
+  var diagnosticID: MessageID { get }
+}
+
+extension TokenWarning {
+  public static var diagnosticID: MessageID {
+    return MessageID(domain: diagnosticDomain, id: "\(self)")
+  }
+
+  public var diagnosticID: MessageID {
+    return Self.diagnosticID
+  }
+
+  public var severity: DiagnosticSeverity {
+    return .warning
   }
 }
 
@@ -85,8 +110,26 @@ public enum StaticTokenWarning: String, DiagnosticMessage {
   public var severity: DiagnosticSeverity { .warning }
 }
 
+@_spi(SyntaxText)
+public struct ExtraneousLeadingWhitespaceError: TokenError {
+  public let tokenText: SyntaxText
+
+  public var message: String {
+    return "extraneous whitespace before '\(tokenText)' is not permitted"
+  }
+}
+
+@_spi(SyntaxText)
+public struct ExtraneousTrailingWhitespaceError: TokenError {
+  public let tokenText: SyntaxText
+
+  public var message: String {
+    return "extraneous whitespace after '\(tokenText)' is not permitted"
+  }
+}
+
 public struct InvalidFloatingPointExponentDigit: TokenError {
-  public enum Kind {
+  public enum Kind: Sendable {
     case digit(Unicode.Scalar)
     case character(Unicode.Scalar)
   }
@@ -103,7 +146,7 @@ public struct InvalidFloatingPointExponentDigit: TokenError {
 }
 
 public struct InvalidDigitInIntegerLiteral: TokenError {
-  public enum Kind {
+  public enum Kind: Sendable {
     case binary(Unicode.Scalar)
     case octal(Unicode.Scalar)
     case decimal(Unicode.Scalar)
@@ -126,27 +169,43 @@ public struct InvalidDigitInIntegerLiteral: TokenError {
   }
 }
 
+/// Downgrades a ``TokenError`` to a ``TokenWarning`` until Swift 6.
+public struct ErrorToWarningDowngrade: TokenWarning {
+  public let error: TokenError
+
+  public var message: String {
+    return "\(error.message); this is an error in Swift 6"
+  }
+}
+
 // MARK: - Convert TokenDiagnostic from SwiftSyntax to error messages
 
-public extension SwiftSyntax.TokenDiagnostic {
+extension SwiftSyntax.TokenDiagnostic {
   /// `tokenText` is the entire text of the token in which the ``TokenDiagnostic``
   /// occurred, including trivia.
   @_spi(RawSyntax)
-  func diagnosticMessage(wholeTextBytes: [UInt8]) -> DiagnosticMessage {
+  public func diagnosticMessage(in token: TokenSyntax) -> DiagnosticMessage {
     var scalarAtErrorOffset: UnicodeScalar {
       // Fall back to the Unicode replacement character U+FFFD in case we can't
       // lex the unicode character at `byteOffset`. It's the best we can do
-      Unicode.Scalar.lexing(from: wholeTextBytes[Int(self.byteOffset)...]) ?? UnicodeScalar("�")
+      Unicode.Scalar.lexing(from: token.syntaxTextBytes[Int(self.byteOffset)...]) ?? UnicodeScalar("�")
     }
 
     switch self.kind {
     case .editorPlaceholder: return StaticTokenError.editorPlaceholder
-    case .equalMustHaveConsistentWhitespaceOnBothSides: return StaticTokenError.equalMustHaveConsistentWhitespaceOnBothSides
+    case .equalMustHaveConsistentWhitespaceOnBothSides:
+      return StaticTokenError.equalMustHaveConsistentWhitespaceOnBothSides
     case .expectedBinaryExponentInHexFloatLiteral: return StaticTokenError.expectedBinaryExponentInHexFloatLiteral
     case .expectedClosingBraceInUnicodeEscape: return StaticTokenError.expectedClosingBraceInUnicodeEscape
     case .expectedDigitInFloatLiteral: return StaticTokenError.expectedDigitInFloatLiteral
     case .expectedHexCodeInUnicodeEscape: return StaticTokenError.expectedHexCodeInUnicodeEscape
     case .expectedHexDigitInHexLiteral: return StaticTokenError.expectedHexDigitInHexLiteral
+    case .extraneousLeadingWhitespaceError: return ExtraneousLeadingWhitespaceError(tokenText: token.rawText)
+    case .extraneousLeadingWhitespaceWarning:
+      return ErrorToWarningDowngrade(error: ExtraneousLeadingWhitespaceError(tokenText: token.rawText))
+    case .extraneousTrailingWhitespaceError: return ExtraneousTrailingWhitespaceError(tokenText: token.rawText)
+    case .extraneousTrailingWhitespaceWarning:
+      return ErrorToWarningDowngrade(error: ExtraneousTrailingWhitespaceError(tokenText: token.rawText))
     case .insufficientIndentationInMultilineStringLiteral:
       // This should be diagnosed when visiting the `StringLiteralExprSyntax`
       // inside `ParseDiagnosticsGenerator` but fall back to an error message
@@ -156,7 +215,8 @@ public extension SwiftSyntax.TokenDiagnostic {
     case .invalidCharacter: return StaticTokenError.invalidCharacter
     case .invalidDecimalDigitInIntegerLiteral: return InvalidDigitInIntegerLiteral(kind: .decimal(scalarAtErrorOffset))
     case .invalidEscapeSequenceInStringLiteral: return StaticTokenError.invalidEscapeSequenceInStringLiteral
-    case .invalidFloatingPointExponentCharacter: return InvalidFloatingPointExponentDigit(kind: .character(scalarAtErrorOffset))
+    case .invalidFloatingPointExponentCharacter:
+      return InvalidFloatingPointExponentDigit(kind: .character(scalarAtErrorOffset))
     case .invalidFloatingPointExponentDigit: return InvalidFloatingPointExponentDigit(kind: .digit(scalarAtErrorOffset))
     case .invalidHexDigitInIntegerLiteral: return InvalidDigitInIntegerLiteral(kind: .hex(scalarAtErrorOffset))
     case .invalidIdentifierStartCharacter: return StaticTokenError.invalidIdentifierStartCharacter
@@ -174,14 +234,26 @@ public extension SwiftSyntax.TokenDiagnostic {
     case .unicodeCurlyQuote: return StaticTokenError.unicodeCurlyQuote
     case .unprintableAsciiCharacter: return StaticTokenError.unprintableAsciiCharacter
     case .unterminatedBlockComment: return StaticTokenError.unterminatedBlockComment
+    #if RESILIENT_LIBRARIES
+    @unknown default:
+      fatalError()
+    #endif
     }
   }
 
-  func diagnosticMessage(in token: TokenSyntax) -> DiagnosticMessage {
-    return self.diagnosticMessage(wholeTextBytes: token.syntaxTextBytes)
+  public func position(in token: TokenSyntax) -> AbsolutePosition {
+    switch kind {
+    case .extraneousLeadingWhitespaceError, .extraneousLeadingWhitespaceWarning:
+      if let previousToken = token.previousToken(viewMode: .all) {
+        return previousToken.endPositionBeforeTrailingTrivia
+      }
+    default:
+      break
+    }
+    return token.position.advanced(by: Int(byteOffset))
   }
 
-  func fixIts(in token: TokenSyntax) -> [FixIt] {
+  public func fixIts(in token: TokenSyntax) -> [FixIt] {
     switch self.kind {
     case .nonBreakingSpace:
       let replaceNonBreakingSpace = { (piece: TriviaPiece) -> TriviaPiece in
@@ -196,7 +268,10 @@ public extension SwiftSyntax.TokenDiagnostic {
         .with(\.leadingTrivia, Trivia(pieces: token.leadingTrivia.map(replaceNonBreakingSpace)))
         .with(\.trailingTrivia, Trivia(pieces: token.trailingTrivia.map(replaceNonBreakingSpace)))
       return [
-        FixIt(message: .replaceNonBreakingSpaceBySpace, changes: [.replace(oldNode: Syntax(token), newNode: Syntax(fixedToken))])
+        FixIt(
+          message: .replaceNonBreakingSpaceBySpace,
+          changes: [.replace(oldNode: Syntax(token), newNode: Syntax(fixedToken))]
+        )
       ]
     case .unicodeCurlyQuote:
       let (rawKind, text) = token.tokenKind.decomposeToRaw()
@@ -210,10 +285,14 @@ public extension SwiftSyntax.TokenDiagnostic {
 
       let fixedToken = token.with(\.tokenKind, TokenKind.fromRaw(kind: rawKind, text: replacedText))
       return [
-        FixIt(message: .replaceCurlyQuoteByNormalQuote, changes: [.replace(oldNode: Syntax(token), newNode: Syntax(fixedToken))])
+        FixIt(
+          message: .replaceCurlyQuoteByNormalQuote,
+          changes: [.replace(oldNode: Syntax(token), newNode: Syntax(fixedToken))]
+        )
       ]
     case .equalMustHaveConsistentWhitespaceOnBothSides:
-      let hasLeadingSpace = token.previousToken(viewMode: .all)?.trailingTrivia.contains(where: { $0.isSpaceOrTab }) ?? false
+      let hasLeadingSpace =
+        token.previousToken(viewMode: .all)?.trailingTrivia.contains(where: { $0.isSpaceOrTab }) ?? false
       let hasTrailingSpace = token.trailingTrivia.contains { $0.isSpaceOrTab }
       var changes: [FixIt.Change] = []
 
@@ -232,8 +311,107 @@ public extension SwiftSyntax.TokenDiagnostic {
       return [
         FixIt(message: .insertWhitespace, changes: changes)
       ]
+    case .extraneousLeadingWhitespaceError, .extraneousLeadingWhitespaceWarning:
+      var changes: [FixIt.Change] = []
+      changes.append(.replaceLeadingTrivia(token: token, newTrivia: []))
+      if let previousToken = token.previousToken(viewMode: .sourceAccurate) {
+        changes.append(.replaceTrailingTrivia(token: previousToken, newTrivia: []))
+      }
+      return [FixIt(message: .removeExtraneousWhitespace, changes: changes)]
+    case .extraneousTrailingWhitespaceError, .extraneousTrailingWhitespaceWarning:
+      var changes: [FixIt.Change] = []
+      changes.append(.replaceTrailingTrivia(token: token, newTrivia: []))
+      if let nextToken = token.nextToken(viewMode: .sourceAccurate) {
+        changes.append(.replaceLeadingTrivia(token: nextToken, newTrivia: []))
+      }
+      return [FixIt(message: .removeExtraneousWhitespace, changes: changes)]
+    case .spaceAtEndOfRegexLiteral:
+      if let regexLiteral = token.regexParent {
+        // wouldn't suggest `insertBackslash` because the potential presence of (?x) somewhere preceding the trailing
+        // space could mean the trailing space has no semantic meaning. Escaping the space could change the semantics.
+        return [regexLiteral.convertToExtendedRegexLiteralFixIt]
+      } else {
+        return []
+      }
+    case .spaceAtStartOfRegexLiteral:
+      guard let regexLiteral = token.regexParent else {
+        return []
+      }
+
+      let regexText = regexLiteral.regex.text
+      let lastIndex = regexText.index(before: regexText.endIndex)
+      if regexText.startIndex != lastIndex && regexText[lastIndex].isWhitespace {
+        // if the regex has a distinct trailing space, same as the handling at `case .spaceAtEndOfRegexLiteral`
+        return [regexLiteral.convertToExtendedRegexLiteralFixIt]
+      } else {
+        let escapedRegexText = #"\\#(regexText)"#
+        return [
+          regexLiteral.convertToExtendedRegexLiteralFixIt,
+          FixIt(
+            message: .insertBackslash,
+            changes: [
+              .replace(
+                oldNode: Syntax(regexLiteral),
+                newNode: Syntax(
+                  regexLiteral
+                    .with(\.regex, .regexLiteralPattern(escapedRegexText))
+                )
+              )
+            ]
+          ),
+        ]
+      }
     default:
       return []
     }
+  }
+}
+
+private extension TokenSyntax {
+  var regexParent: RegexLiteralExprSyntax? {
+    var parent = Syntax(self)
+    while parent.kind != .regexLiteralExpr, let upper = parent.parent {
+      parent = upper
+    }
+    return parent.as(RegexLiteralExprSyntax.self)
+  }
+}
+
+private extension RegexLiteralExprSyntax {
+  /// Creates a Fix-it that suggests converting to extended regex literal
+  ///
+  /// Covers the following cases:
+  /// ```swift
+  /// let leadingSpaceRegex = / ,/
+  /// // converts to
+  /// let leadingSpaceExtendedRegex = #/ ,/#
+  ///
+  /// let leadingAndTrailingSpaceRegex = / , /
+  /// // converts to
+  /// let leadingAndTrailingSpaceExtendedRegex = #/ , /#
+  ///
+  /// let trailingSpaceRegex = /, /
+  /// // converts to
+  /// let trailingSpaceExtendedRegex = #/ ,/#
+  ///
+  /// let trailingSpaceMissingClosingSlashRegex = /,
+  /// // converts to
+  /// let trailingSpaceExtendedRegex = #/, /#
+  /// ```
+  var convertToExtendedRegexLiteralFixIt: FixIt {
+    FixIt(
+      message: .convertToExtendedRegexLiteral,
+      changes: [
+        .replace(
+          oldNode: Syntax(self),
+          newNode: Syntax(
+            with(\.openingSlash, .regexSlashToken())
+              .with(\.openingPounds, .regexPoundDelimiter("#", leadingTrivia: leadingTrivia))
+              .with(\.closingPounds, .regexPoundDelimiter("#", trailingTrivia: trailingTrivia))
+              .with(\.closingSlash, .regexSlashToken())
+          )
+        )
+      ]
+    )
   }
 }

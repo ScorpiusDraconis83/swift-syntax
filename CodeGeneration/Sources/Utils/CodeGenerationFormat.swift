@@ -32,7 +32,9 @@ public class CodeGenerationFormat: BasicFormat {
     let children = node.children(viewMode: .all)
     // Short array literals are presented on one line, list each element on a different line.
     if children.count > maxElementsOnSameLine {
-      return ArrayElementListSyntax(formatChildrenSeparatedByNewline(children: children, elementType: ArrayElementSyntax.self))
+      return ArrayElementListSyntax(
+        formatChildrenSeparatedByNewline(children: children, elementType: ArrayElementSyntax.self)
+      )
     } else {
       return super.visit(node)
     }
@@ -51,7 +53,9 @@ public class CodeGenerationFormat: BasicFormat {
     let children = node.children(viewMode: .all)
     // Short dictionary literals are presented on one line, list each element on a different line.
     if children.count > maxElementsOnSameLine {
-      return DictionaryElementListSyntax(formatChildrenSeparatedByNewline(children: children, elementType: DictionaryElementSyntax.self))
+      return DictionaryElementListSyntax(
+        formatChildrenSeparatedByNewline(children: children, elementType: DictionaryElementSyntax.self)
+      )
     } else {
       return super.visit(node)
     }
@@ -61,7 +65,9 @@ public class CodeGenerationFormat: BasicFormat {
     let children = node.children(viewMode: .all)
     // Short function parameter literals are presented on one line, list each element on a different line.
     if children.count > maxElementsOnSameLine {
-      return FunctionParameterListSyntax(formatChildrenSeparatedByNewline(children: children, elementType: FunctionParameterSyntax.self))
+      return FunctionParameterListSyntax(
+        formatChildrenSeparatedByNewline(children: children, elementType: FunctionParameterSyntax.self)
+      )
     } else {
       return super.visit(node)
     }
@@ -77,7 +83,9 @@ public class CodeGenerationFormat: BasicFormat {
 
   public override func visit(_ node: MemberBlockItemSyntax) -> MemberBlockItemSyntax {
     let formatted = super.visit(node)
-    if node != node.parent?.children(viewMode: .sourceAccurate).first?.as(MemberBlockItemSyntax.self) && !node.decl.is(EnumCaseDeclSyntax.self) {
+    if node != node.parent?.children(viewMode: .sourceAccurate).first?.as(MemberBlockItemSyntax.self)
+      && !node.decl.is(EnumCaseDeclSyntax.self)
+    {
       return ensuringTwoLeadingNewlines(node: formatted)
     } else {
       return formatted
@@ -88,10 +96,40 @@ public class CodeGenerationFormat: BasicFormat {
     let children = node.children(viewMode: .all)
     // Short tuple element list literals are presented on one line, list each element on a different line.
     if children.count > maxElementsOnSameLine {
-      return LabeledExprListSyntax(formatChildrenSeparatedByNewline(children: children, elementType: LabeledExprSyntax.self))
+      let inMethodCallThatStartsOnNewline =
+        node.parent?.as(FunctionCallExprSyntax.self)?.calledExpression.as(MemberAccessExprSyntax.self)?.period
+        .startsOnNewline ?? false
+      if inMethodCallThatStartsOnNewline {
+        increaseIndentationLevel()
+      }
+      defer {
+        if inMethodCallThatStartsOnNewline {
+          decreaseIndentationLevel()
+        }
+      }
+
+      return LabeledExprListSyntax(
+        formatChildrenSeparatedByNewline(children: children, elementType: LabeledExprSyntax.self)
+      )
     } else {
       return super.visit(node)
     }
+  }
+
+  public override func requiresIndent(_ node: some SyntaxProtocol) -> Bool {
+    switch node.kind {
+    case .arrayElementList, .dictionaryElementList, .functionParameterList, .labeledExprList:
+      let indentManually = node.children(viewMode: .sourceAccurate).count > maxElementsOnSameLine
+      if indentManually {
+        return false
+      }
+      if !node.startsOnNewline {
+        return false
+      }
+    default:
+      break
+    }
+    return super.requiresIndent(node)
   }
 
   // MARK: - Private
@@ -104,28 +142,56 @@ public class CodeGenerationFormat: BasicFormat {
 
   private func ensuringTwoLeadingNewlines<NodeType: SyntaxProtocol>(node: NodeType) -> NodeType {
     if node.leadingTrivia.first?.isNewline ?? false {
-      return node.with(\.leadingTrivia, indentedNewline + node.leadingTrivia)
+      return node.with(\.leadingTrivia, .newline + node.leadingTrivia)
     } else {
-      return node.with(\.leadingTrivia, indentedNewline + indentedNewline + node.leadingTrivia)
+      return node.with(\.leadingTrivia, .newlines(2) + node.leadingTrivia)
     }
   }
 
-  private func formatChildrenSeparatedByNewline<SyntaxType: SyntaxProtocol>(children: SyntaxChildren, elementType: SyntaxType.Type) -> [SyntaxType] {
+  private func formatChildrenSeparatedByNewline<SyntaxType: SyntaxProtocol>(
+    children: SyntaxChildren,
+    elementType: SyntaxType.Type
+  ) -> [SyntaxType] {
     increaseIndentationLevel()
     var formattedChildren = children.map {
-      self.rewrite($0.cast(SyntaxType.self)).cast(SyntaxType.self)
+      return self.rewrite($0.cast(SyntaxType.self)).cast(SyntaxType.self)
     }
-    formattedChildren = formattedChildren.map {
-      if $0.leadingTrivia.first?.isNewline == true {
-        return $0
+    formattedChildren = formattedChildren.map { child in
+      var child = child
+
+      if let firstNonSpaceOrTabIndex = child.trailingTrivia.firstIndex(where: { !$0.isSpaceOrTab }) {
+        if child.trailingTrivia[firstNonSpaceOrTabIndex].isNewline {
+          child.trailingTrivia = Trivia(pieces: child.trailingTrivia.suffix(from: firstNonSpaceOrTabIndex))
+        }
       } else {
-        return $0.with(\.leadingTrivia, indentedNewline + $0.leadingTrivia)
+        child.trailingTrivia = Trivia()
       }
+
+      if !child.startsOnNewline {
+        child.leadingTrivia = indentedNewline + child.leadingTrivia
+      }
+      return child
     }
     decreaseIndentationLevel()
-    if !formattedChildren.isEmpty {
-      formattedChildren[formattedChildren.count - 1] = formattedChildren[formattedChildren.count - 1].with(\.trailingTrivia, indentedNewline)
+    if let lastChild = formattedChildren.last,
+      !lastChild.trailingTrivia.contains(where: \.isNewline)
+    {
+      let nextTokenStartsWithNewline =
+        lastChild.nextToken(viewMode: .sourceAccurate)?.leadingTrivia.first?.isNewline ?? false
+      if !nextTokenStartsWithNewline {
+        formattedChildren[formattedChildren.count - 1] = lastChild.with(
+          \.trailingTrivia,
+          lastChild.trailingTrivia + indentedNewline
+        )
+      }
     }
     return formattedChildren
+  }
+}
+
+private extension SyntaxProtocol {
+  var startsOnNewline: Bool {
+    return self.leadingTrivia.contains(where: \.isNewline)
+      || self.previousToken(viewMode: .sourceAccurate)?.trailingTrivia.contains(where: \.isNewline) ?? false
   }
 }

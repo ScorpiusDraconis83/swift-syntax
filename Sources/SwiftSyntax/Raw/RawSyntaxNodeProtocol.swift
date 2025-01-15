@@ -13,7 +13,7 @@
 /// All typed raw syntax nodes conform to this protocol.
 /// `RawXXXSyntax` is a typed wrappeer of ``RawSyntax``.
 @_spi(RawSyntax)
-public protocol RawSyntaxNodeProtocol: CustomStringConvertible, TextOutputStreamable {
+public protocol RawSyntaxNodeProtocol: CustomStringConvertible, TextOutputStreamable, Sendable {
   /// Returns `true` if `raw` can be cast to this concrete raw syntax type.
   static func isKindOf(_ raw: RawSyntax) -> Bool
 
@@ -24,30 +24,30 @@ public protocol RawSyntaxNodeProtocol: CustomStringConvertible, TextOutputStream
   init?(_ other: some RawSyntaxNodeProtocol)
 }
 
-public extension RawSyntaxNodeProtocol {
+extension RawSyntaxNodeProtocol {
   /// Cast to the specified raw syntax type if possible.
-  func `as`<Node: RawSyntaxNodeProtocol>(_: Node.Type) -> Node? {
+  public func `as`<Node: RawSyntaxNodeProtocol>(_: Node.Type) -> Node? {
     Node(self)
   }
 
   /// Check if this instance can be cast to the specified syntax type.
-  func `is`<Node: RawSyntaxNodeProtocol>(_: Node.Type) -> Bool {
+  public func `is`<Node: RawSyntaxNodeProtocol>(_: Node.Type) -> Bool {
     Node.isKindOf(self.raw)
   }
 
-  func cast<S: RawSyntaxNodeProtocol>(_ syntaxType: S.Type) -> S {
+  public func cast<S: RawSyntaxNodeProtocol>(_ syntaxType: S.Type) -> S {
     return self.as(S.self)!
   }
 
-  var description: String {
+  public var description: String {
     raw.description
   }
 
-  func write(to target: inout some TextOutputStream) {
+  public func write(to target: inout some TextOutputStream) {
     raw.write(to: &target)
   }
 
-  var isEmpty: Bool {
+  public var isEmpty: Bool {
     return raw.byteLength == 0
   }
 
@@ -55,7 +55,7 @@ public extension RawSyntaxNodeProtocol {
   ///  - missing nodes or
   ///  - unexpected nodes or
   ///  - tokens with a ``TokenDiagnostic`` of severity `error`
-  var hasError: Bool {
+  public var hasError: Bool {
     return raw.recursiveFlags.contains(.hasError)
   }
 }
@@ -183,7 +183,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     textRange: Range<SyntaxText.Index>,
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic?,
-    arena: __shared SyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) {
     let raw = RawSyntax.parsedToken(
       kind: kind,
@@ -205,7 +205,7 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     trailingTriviaPieces: [RawTriviaPiece] = [],
     presence: SourcePresence,
     tokenDiagnostic: TokenDiagnostic? = nil,
-    arena: __shared SyntaxArena
+    arena: __shared ParsingSyntaxArena
   ) {
     if leadingTriviaPieces.isEmpty && trailingTriviaPieces.isEmpty {
       // Create it via `RawSyntax.parsedToken()`.
@@ -270,9 +270,6 @@ public struct RawTokenSyntax: RawSyntaxNodeProtocol {
     trailingTriviaPieces: [RawTriviaPiece] = [],
     arena: __shared SyntaxArena
   ) {
-    // FIXME: Allow creating a `RawSyntax.parsedToken()` with a string literal
-    // for text. Currently it asserts that the string buffer is not contained
-    // within the `arena`.
     self.init(
       materialized: kind,
       text: text ?? kind.defaultText ?? "",

@@ -10,9 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftDiagnostics
+@_spi(Diagnostics) internal import SwiftParser
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 import SwiftDiagnostics
 @_spi(Diagnostics) import SwiftParser
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension ParseDiagnosticsGenerator {
   func handleMissingToken(_ missingToken: TokenSyntax) {
@@ -31,13 +37,29 @@ extension ParseDiagnosticsGenerator {
     let handled: Bool
     switch (missingToken.tokenView.rawKind, invalidToken.tokenView.rawKind) {
     case (.identifier, _):
-      handled = handleInvalidIdentifier(invalidToken: invalidToken, missingToken: missingToken, invalidTokenContainer: invalidTokenContainer)
+      handled = handleInvalidIdentifier(
+        invalidToken: invalidToken,
+        missingToken: missingToken,
+        invalidTokenContainer: invalidTokenContainer
+      )
     case (.multilineStringQuote, .multilineStringQuote):
-      handled = handleInvalidMultilineStringQuote(invalidToken: invalidToken, missingToken: missingToken, invalidTokenContainer: invalidTokenContainer)
+      handled = handleInvalidMultilineStringQuote(
+        invalidToken: invalidToken,
+        missingToken: missingToken,
+        invalidTokenContainer: invalidTokenContainer
+      )
     case (.period, .period):
-      handled = handleInvalidPeriod(invalidToken: invalidToken, missingToken: missingToken, invalidTokenContainer: invalidTokenContainer)
+      handled = handleInvalidPeriod(
+        invalidToken: invalidToken,
+        missingToken: missingToken,
+        invalidTokenContainer: invalidTokenContainer
+      )
     case (.rawStringPoundDelimiter, .rawStringPoundDelimiter), (.regexPoundDelimiter, .regexPoundDelimiter):
-      handled = handleInvalidPoundDelimiter(invalidToken: invalidToken, missingToken: missingToken, invalidTokenContainer: invalidTokenContainer)
+      handled = handleInvalidPoundDelimiter(
+        invalidToken: invalidToken,
+        missingToken: missingToken,
+        invalidTokenContainer: invalidTokenContainer
+      )
     default:
       handled = false
     }
@@ -46,11 +68,13 @@ extension ParseDiagnosticsGenerator {
     }
   }
 
-  private func handleInvalidIdentifier(invalidToken: TokenSyntax, missingToken: TokenSyntax, invalidTokenContainer: UnexpectedNodesSyntax) -> Bool {
+  private func handleInvalidIdentifier(
+    invalidToken: TokenSyntax,
+    missingToken: TokenSyntax,
+    invalidTokenContainer: UnexpectedNodesSyntax
+  ) -> Bool {
     let fixIts: [FixIt]
     if invalidToken.tokenKind.isLexerClassifiedKeyword || invalidToken.tokenKind.isDollarIdentifier {
-      // TODO: Should the parser add the text with backticks to the missing
-      // node? Then this could just make missing/present.
       fixIts = [
         FixIt(
           message: .wrapInBackticks,
@@ -58,7 +82,11 @@ extension ParseDiagnosticsGenerator {
             .replace(
               oldNode: Syntax(invalidToken),
               newNode: Syntax(
-                TokenSyntax.identifier("`\(invalidToken.text)`", leadingTrivia: invalidToken.leadingTrivia, trailingTrivia: invalidToken.trailingTrivia)
+                TokenSyntax.identifier(
+                  "`\(invalidToken.text)`",
+                  leadingTrivia: invalidToken.leadingTrivia,
+                  trailingTrivia: invalidToken.trailingTrivia
+                )
               )
             )
           ]
@@ -76,13 +104,22 @@ extension ParseDiagnosticsGenerator {
     return true
   }
 
-  private func handleInvalidMultilineStringQuote(invalidToken: TokenSyntax, missingToken: TokenSyntax, invalidTokenContainer: UnexpectedNodesSyntax) -> Bool {
+  private func handleInvalidMultilineStringQuote(
+    invalidToken: TokenSyntax,
+    missingToken: TokenSyntax,
+    invalidTokenContainer: UnexpectedNodesSyntax
+  ) -> Bool {
     if invalidToken.trailingTrivia.isEmpty && !missingToken.trailingTrivia.isEmpty {
       addDiagnostic(
         invalidToken,
         position: invalidToken.endPositionBeforeTrailingTrivia,
         .multiLineStringLiteralMustBeginOnNewLine,
-        fixIts: [FixIt(message: .insertNewline, changes: [.replaceTrailingTrivia(token: invalidToken, newTrivia: missingToken.trailingTrivia)])],
+        fixIts: [
+          FixIt(
+            message: .insertNewline,
+            changes: [.replaceTrailingTrivia(token: invalidToken, newTrivia: missingToken.trailingTrivia)]
+          )
+        ],
         handledNodes: [invalidTokenContainer.id]
       )
       return true
@@ -90,7 +127,12 @@ extension ParseDiagnosticsGenerator {
       addDiagnostic(
         invalidToken,
         .multiLineStringLiteralMustHaveClosingDelimiterOnNewLine,
-        fixIts: [FixIt(message: .insertNewline, changes: [.replaceLeadingTrivia(token: invalidToken, newTrivia: missingToken.leadingTrivia)])],
+        fixIts: [
+          FixIt(
+            message: .insertNewline,
+            changes: [.replaceLeadingTrivia(token: invalidToken, newTrivia: missingToken.leadingTrivia)]
+          )
+        ],
         handledNodes: [invalidTokenContainer.id]
       )
       return true
@@ -99,7 +141,11 @@ extension ParseDiagnosticsGenerator {
     return false
   }
 
-  private func handleInvalidPeriod(invalidToken: TokenSyntax, missingToken: TokenSyntax, invalidTokenContainer: UnexpectedNodesSyntax) -> Bool {
+  private func handleInvalidPeriod(
+    invalidToken: TokenSyntax,
+    missingToken: TokenSyntax,
+    invalidTokenContainer: UnexpectedNodesSyntax
+  ) -> Bool {
     // Trailing trivia is the cause of this diagnostic, don't transfer it.
     let changes: [FixIt.MultiNodeChange] = [
       .makeMissing(invalidToken, transferTrivia: false),
@@ -126,7 +172,12 @@ extension ParseDiagnosticsGenerator {
       )
     } else {
       let fixIt = FixIt(message: .removeExtraneousWhitespace, changes: changes)
-      addDiagnostic(invalidToken, ExtraneousWhitespace(tokenWithWhitespace: invalidToken), fixIts: [fixIt], handledNodes: [invalidTokenContainer.id])
+      addDiagnostic(
+        invalidToken,
+        ExtraneousWhitespace(tokenWithWhitespace: invalidToken),
+        fixIts: [fixIt],
+        handledNodes: [invalidTokenContainer.id]
+      )
     }
     return true
   }

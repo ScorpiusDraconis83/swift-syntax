@@ -13,8 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 /// Enumerates the known kinds of Syntax represented in the Syntax tree.
-public enum SyntaxKind {
+public enum SyntaxKind: Sendable {
   case token
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case abiAttributeArguments
   case accessorBlock
   case accessorDeclList
   case accessorDecl
@@ -42,8 +46,8 @@ public enum SyntaxKind {
   case booleanLiteralExpr
   case borrowExpr
   case breakStmt
-  case canImportExpr
-  case canImportVersionInfo
+  case _canImportExpr
+  case _canImportVersionInfo
   case catchClauseList
   case catchClause
   case catchItemList
@@ -178,6 +182,18 @@ public enum SyntaxKind {
   case labeledSpecializeArgument
   case labeledStmt
   case layoutRequirement
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeSpecifierArgumentList
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeSpecifierArgument
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeTypeSpecifier
   case macroDecl
   case macroExpansionDecl
   case macroExpansionExpr
@@ -241,6 +257,7 @@ public enum SyntaxKind {
   case sequenceExpr
   case simpleStringLiteralExpr
   case simpleStringLiteralSegmentList
+  case simpleTypeSpecifier
   case someOrAnyType
   case sourceFile
   case specializeAttributeArgumentList
@@ -281,12 +298,17 @@ public enum SyntaxKind {
   case typeEffectSpecifiers
   case typeExpr
   case typeInitializerClause
+  case typeSpecifierList
   case unavailableFromAsyncAttributeArguments
   case underscorePrivateAttributeArguments
   case unexpectedNodes
   case unresolvedAsExpr
   case unresolvedIsExpr
   case unresolvedTernaryExpr
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case unsafeExpr
   case valueBindingPattern
   case variableDecl
   case versionComponentList
@@ -299,7 +321,7 @@ public enum SyntaxKind {
   case yieldedExpressionList
   case yieldedExpression
   case yieldedExpressionsClause
-  
+
   public var isSyntaxCollection: Bool {
     switch self {
     case .accessorDeclList:
@@ -364,6 +386,8 @@ public enum SyntaxKind {
       return true
     case .labeledExprList:
       return true
+    case .lifetimeSpecifierArgumentList:
+      return true
     case .memberBlockItemList:
       return true
     case .multipleTrailingClosureElementList:
@@ -394,6 +418,8 @@ public enum SyntaxKind {
       return true
     case .tupleTypeElementList:
       return true
+    case .typeSpecifierList:
+      return true
     case .unexpectedNodes:
       return true
     case .versionComponentList:
@@ -404,7 +430,7 @@ public enum SyntaxKind {
       return false
     }
   }
-  
+
   public var isMissing: Bool {
     switch self {
     case .missing:
@@ -423,11 +449,13 @@ public enum SyntaxKind {
       return false
     }
   }
-  
+
   public var syntaxNodeType: SyntaxProtocol.Type {
     switch self {
     case .token:
       return TokenSyntax.self
+    case .abiAttributeArguments:
+      return ABIAttributeArgumentsSyntax.self
     case .accessorBlock:
       return AccessorBlockSyntax.self
     case .accessorDeclList:
@@ -482,10 +510,10 @@ public enum SyntaxKind {
       return BorrowExprSyntax.self
     case .breakStmt:
       return BreakStmtSyntax.self
-    case .canImportExpr:
-      return CanImportExprSyntax.self
-    case .canImportVersionInfo:
-      return CanImportVersionInfoSyntax.self
+    case ._canImportExpr:
+      return _CanImportExprSyntax.self
+    case ._canImportVersionInfo:
+      return _CanImportVersionInfoSyntax.self
     case .catchClauseList:
       return CatchClauseListSyntax.self
     case .catchClause:
@@ -748,6 +776,12 @@ public enum SyntaxKind {
       return LabeledStmtSyntax.self
     case .layoutRequirement:
       return LayoutRequirementSyntax.self
+    case .lifetimeSpecifierArgumentList:
+      return LifetimeSpecifierArgumentListSyntax.self
+    case .lifetimeSpecifierArgument:
+      return LifetimeSpecifierArgumentSyntax.self
+    case .lifetimeTypeSpecifier:
+      return LifetimeTypeSpecifierSyntax.self
     case .macroDecl:
       return MacroDeclSyntax.self
     case .macroExpansionDecl:
@@ -874,6 +908,8 @@ public enum SyntaxKind {
       return SimpleStringLiteralExprSyntax.self
     case .simpleStringLiteralSegmentList:
       return SimpleStringLiteralSegmentListSyntax.self
+    case .simpleTypeSpecifier:
+      return SimpleTypeSpecifierSyntax.self
     case .someOrAnyType:
       return SomeOrAnyTypeSyntax.self
     case .sourceFile:
@@ -948,6 +984,8 @@ public enum SyntaxKind {
       return TypeExprSyntax.self
     case .typeInitializerClause:
       return TypeInitializerClauseSyntax.self
+    case .typeSpecifierList:
+      return TypeSpecifierListSyntax.self
     case .unavailableFromAsyncAttributeArguments:
       return UnavailableFromAsyncAttributeArgumentsSyntax.self
     case .underscorePrivateAttributeArguments:
@@ -960,6 +998,8 @@ public enum SyntaxKind {
       return UnresolvedIsExprSyntax.self
     case .unresolvedTernaryExpr:
       return UnresolvedTernaryExprSyntax.self
+    case .unsafeExpr:
+      return UnsafeExprSyntax.self
     case .valueBindingPattern:
       return ValueBindingPatternSyntax.self
     case .variableDecl:

@@ -1,23 +1,21 @@
-load("//utils/bazel:swift_syntax_library.bzl", "swift_syntax_library")
+load("@build_bazel_rules_apple//apple/testing/default_runner:ios_xctestrun_runner.bzl", "ios_xctestrun_runner")
+load("//utils/bazel:swift_syntax_library.bzl", "swift_syntax_library", "swift_syntax_test")
 
 package(default_visibility = ["//visibility:public"])
-
-swift_syntax_library(
-    name = "SwiftIDEUtils",
-    deps = [
-        ":SwiftSyntax",
-    ],
-)
-
-swift_syntax_library(
-    name = "SwiftSyntax",
-    deps = [],
-)
 
 swift_syntax_library(
     name = "SwiftBasicFormat",
     deps = [
         ":SwiftSyntax",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftBasicFormatTest",
+    deps = [
+        ":SwiftBasicFormat",
+        ":SwiftSyntaxBuilder",
+        ":_SwiftSyntaxTestSupport",
     ],
 )
 
@@ -35,17 +33,17 @@ swift_syntax_library(
         ":SwiftDiagnostics",
         ":SwiftOperators",
         ":SwiftParser",
+        ":SwiftSyntax",
         ":SwiftSyntaxMacroExpansion",
         ":SwiftSyntaxMacros",
+        ":_SwiftSyntaxCShims",
     ],
 )
 
-swift_syntax_library(
-    name = "SwiftSyntaxMacroExpansion",
+swift_syntax_test(
+    name = "SwiftCompilerPluginTest",
     deps = [
-        ":SwiftOperators",
-        ":SwiftSyntax",
-        ":SwiftSyntaxMacros",
+        ":SwiftCompilerPlugin",
     ],
 )
 
@@ -56,21 +54,101 @@ swift_syntax_library(
     ],
 )
 
+swift_syntax_test(
+    name = "SwiftDiagnosticsTest",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftParser",
+        ":SwiftParserDiagnostics",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
 swift_syntax_library(
-    name = "SwiftSyntaxMacros",
+    name = "SwiftIDEUtils",
     deps = [
         ":SwiftDiagnostics",
         ":SwiftParser",
         ":SwiftSyntax",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftIDEUtilsTest",
+    deps = [
+        ":SwiftIDEUtils",
+        ":SwiftParser",
+        ":SwiftSyntax",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftIfConfig",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftOperators",
+        ":SwiftSyntax",
         ":SwiftSyntaxBuilder",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftIfConfigTest",
+    deps = [
+        ":SwiftIfConfig",
+        ":SwiftParser",
+        ":SwiftSyntaxMacrosGenericTestSupport",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftLexicalLookup",
+    deps = [
+        ":SwiftIfConfig",
+        ":SwiftSyntax",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftLexicalLookupTest",
+    deps = [
+        ":SwiftLexicalLookup",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftLibraryPluginProvider",
+    deps = [
+        ":SwiftCompilerPluginMessageHandling",
+        ":SwiftSyntaxMacros",
+        ":_SwiftLibraryPluginProviderCShims",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftOperators",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftParser",
+        ":SwiftSyntax",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftOperatorsTest",
+    deps = [
+        ":SwiftOperators",
+        ":SwiftParser",
+        ":_SwiftSyntaxTestSupport",
     ],
 )
 
 swift_syntax_library(
     name = "SwiftParser",
     deps = [
-        ":SwiftBasicFormat",
-        ":SwiftDiagnostics",
         ":SwiftSyntax",
     ],
 )
@@ -85,28 +163,131 @@ swift_syntax_library(
     ],
 )
 
-swift_syntax_library(
-    name = "SwiftSyntaxBuilder",
+swift_syntax_test(
+    name = "SwiftParserDiagnosticsTest",
     deps = [
-        ":SwiftBasicFormat",
-        ":SwiftParser",
+        ":SwiftDiagnostics",
         ":SwiftParserDiagnostics",
-        ":SwiftSyntax",
     ],
 )
 
-swift_syntax_library(
-    name = "SwiftOperators",
+swift_syntax_test(
+    name = "SwiftParserTest",
     deps = [
         ":SwiftDiagnostics",
+        ":SwiftIDEUtils",
+        ":SwiftOperators",
         ":SwiftParser",
-        ":SwiftSyntax",
+        ":SwiftSyntaxBuilder",
+        ":_SwiftSyntaxTestSupport",
     ],
 )
 
 swift_syntax_library(
     name = "SwiftRefactor",
     deps = [
+        ":SwiftBasicFormat",
+        ":SwiftParser",
+        ":SwiftSyntax",
+        ":SwiftSyntaxBuilder",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftRefactorTest",
+    deps = [
+        ":SwiftRefactor",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntax",
+    deps = [
+        ":SwiftSyntax509",
+        ":SwiftSyntax510",
+        ":SwiftSyntax600",
+        ":_SwiftSyntaxCShims",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntax509",
+    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax509/**/*.swift"]),
+    deps = [
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntax510",
+    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax510/**/*.swift"]),
+    deps = [
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntax600",
+    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax600/**/*.swift"]),
+    deps = [
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntax601",
+    srcs = glob(["Sources/VersionMarkerModules/SwiftSyntax601/**/*.swift"]),
+    deps = [
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntaxBuilder",
+    deps = [
+        ":SwiftBasicFormat",
+        ":SwiftDiagnostics",
+        ":SwiftParser",
+        ":SwiftParserDiagnostics",
+        ":SwiftSyntax",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftSyntaxBuilderTest",
+    deps = [
+        ":SwiftSyntaxBuilder",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntaxMacroExpansion",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftOperators",
+        ":SwiftSyntax",
+        ":SwiftSyntaxBuilder",
+        ":SwiftSyntaxMacros",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftSyntaxMacroExpansionTest",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftOperators",
+        ":SwiftParser",
+        ":SwiftSyntax",
+        ":SwiftSyntaxBuilder",
+        ":SwiftSyntaxMacroExpansion",
+        ":SwiftSyntaxMacros",
+        ":SwiftSyntaxMacrosTestSupport",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntaxMacros",
+    deps = [
+        ":SwiftDiagnostics",
         ":SwiftParser",
         ":SwiftSyntax",
         ":SwiftSyntaxBuilder",
@@ -114,14 +295,85 @@ swift_syntax_library(
 )
 
 swift_syntax_library(
-    name = "SwiftSyntaxMacrosTestSupport",
+    name = "SwiftSyntaxMacrosGenericTestSupport",
     testonly = True,
     deps = [
         ":SwiftDiagnostics",
+        ":SwiftIDEUtils",
         ":SwiftParser",
         ":SwiftSyntaxMacroExpansion",
         ":SwiftSyntaxMacros",
+        ":_SwiftSyntaxGenericTestSupport",
+    ],
+)
+
+swift_syntax_library(
+    name = "SwiftSyntaxMacrosTestSupport",
+    testonly = True,
+    deps = [
+        ":SwiftSyntax",
+        ":SwiftSyntaxMacroExpansion",
+        ":SwiftSyntaxMacros",
+        ":SwiftSyntaxMacrosGenericTestSupport",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftSyntaxMacrosTestSupportTests",
+    deps = [
+        ":SwiftDiagnostics",
+        ":SwiftSyntax",
+        ":SwiftSyntaxMacros",
+        ":SwiftSyntaxMacrosTestSupport",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftSyntaxTest",
+    deps = [
+        ":SwiftSyntax",
+        ":SwiftSyntaxBuilder",
         ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+swift_syntax_test(
+    name = "SwiftSyntaxTestSupportTest",
+    deps = [
+        ":SwiftParser",
+        ":_SwiftSyntaxTestSupport",
+    ],
+)
+
+cc_library(
+    name = "_InstructionCounter",
+    srcs = glob(["Sources/_InstructionCounter/src/*.c"]),
+    hdrs = glob(["Sources/_InstructionCounter/include/*.h"]),
+    includes = ["Sources/_InstructionCounter/include"],
+    tags = ["swift_module=_InstructionCounter"],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "_SwiftLibraryPluginProviderCShims",
+    hdrs = glob(["Sources/_SwiftLibraryPluginProviderCShims/include/*.h"]),
+    includes = ["Sources/_SwiftLibraryPluginProviderCShims/include"],
+    tags = ["swift_module=_SwiftLibraryPluginProviderCShims"],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "_SwiftSyntaxCShims",
+    hdrs = glob(["Sources/_SwiftSyntaxCShims/include/*.h"]),
+    includes = ["Sources/_SwiftSyntaxCShims/include"],
+    tags = ["swift_module=_SwiftSyntaxCShims"],
+    visibility = ["//visibility:private"],
+)
+
+swift_syntax_library(
+    name = "_SwiftSyntaxGenericTestSupport",
+    testonly = True,
+    deps = [
     ],
 )
 
@@ -132,5 +384,14 @@ swift_syntax_library(
         ":SwiftBasicFormat",
         ":SwiftSyntax",
         ":SwiftSyntaxBuilder",
+        ":SwiftSyntaxMacroExpansion",
+        ":_SwiftSyntaxGenericTestSupport",
     ],
+)
+
+ios_xctestrun_runner(
+    name = "ios_test_runner",
+    random = False,
+    reuse_simulator = True,
+    visibility = ["//visibility:private"],
 )

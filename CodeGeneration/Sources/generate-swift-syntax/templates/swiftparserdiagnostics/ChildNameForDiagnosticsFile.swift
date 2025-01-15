@@ -16,7 +16,15 @@ import SyntaxSupport
 import Utils
 
 let childNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightHeader) {
-  DeclSyntax("@_spi(ExperimentalLanguageFeatures) import SwiftSyntax")
+  DeclSyntax(
+    """
+    #if compiler(>=6)
+    @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+    #else
+    @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+    #endif
+    """
+  )
 
   try! FunctionDeclSyntax(
     "private func childNameForDiagnostics(_ keyPath: AnyKeyPath) -> String?"
@@ -25,7 +33,7 @@ let childNameForDiagnosticFile = SourceFileSyntax(leadingTrivia: copyrightHeader
       for node in NON_BASE_SYNTAX_NODES.compactMap(\.layoutNode) {
         for child in node.children {
           if let nameForDiagnostics = child.nameForDiagnostics {
-            SwitchCaseSyntax("case \\\(node.type.syntaxBaseName).\(child.varOrCaseName):") {
+            SwitchCaseSyntax("case \\\(node.type.syntaxBaseName).\(child.memberCallName):") {
               StmtSyntax(#"return "\#(raw: nameForDiagnostics)""#)
             }
           }

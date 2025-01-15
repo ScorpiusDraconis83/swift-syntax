@@ -10,8 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+import SwiftParser
+public import SwiftSyntax
+#else
 import SwiftParser
 import SwiftSyntax
+#endif
 
 /// Given a set of positions in a source file, resolve the names of the
 /// declarations that are referenced at these locations and, if they refer to
@@ -55,7 +60,10 @@ public class NameMatcher: SyntaxAnyVisitor {
 
   // MARK: - Public entry
 
-  public static func resolve(baseNamePositions: some Sequence<AbsolutePosition>, in tree: some SyntaxProtocol) -> [DeclNameLocation] {
+  public static func resolve(
+    baseNamePositions: some Sequence<AbsolutePosition>,
+    in tree: some SyntaxProtocol
+  ) -> [DeclNameLocation] {
     let matcher = NameMatcher(baseNamePositions: baseNamePositions)
     matcher.walk(tree)
     return matcher.resolvedLocs
@@ -90,6 +98,21 @@ public class NameMatcher: SyntaxAnyVisitor {
       if range.contains(positionToResolve) {
         return positionToResolve
       }
+    }
+    return nil
+  }
+
+  /// Finds the first position to resolve that is in the leading or trailing trivia of this token.
+  ///
+  /// If one is found, also returns the range of the trivia in which the position was found.
+  private func firstPositionToResolve(
+    inTriviaOf token: TokenSyntax
+  ) -> (position: AbsolutePosition, triviaRange: Range<AbsolutePosition>)? {
+    if let position = firstPositionToResolve(in: token.leadingTriviaRange) {
+      return (position, token.leadingTriviaRange)
+    }
+    if let position = firstPositionToResolve(in: token.trailingTriviaRange) {
+      return (position, token.trailingTriviaRange)
     }
     return nil
   }
@@ -167,7 +190,10 @@ public class NameMatcher: SyntaxAnyVisitor {
         return .labeled(firstName: additionalTrailingClosure.label, secondName: nil)
       }
     }
-    addResolvedLocIfRequested(baseName: baseName, argumentLabels: .call(argumentLabels, firstTrailingClosureIndex: firstTrailingClosureIndex))
+    addResolvedLocIfRequested(
+      baseName: baseName,
+      argumentLabels: .call(argumentLabels, firstTrailingClosureIndex: firstTrailingClosureIndex)
+    )
   }
 
   /// Try resolving a function-style declaration at `baseName`.
@@ -194,20 +220,25 @@ public class NameMatcher: SyntaxAnyVisitor {
   }
 
   public override func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
-    while let baseNamePosition = firstPositionToResolve(in: token.leadingTriviaRange) ?? firstPositionToResolve(in: token.trailingTriviaRange) {
+    while let (baseNamePosition, triviaRange) = firstPositionToResolve(inTriviaOf: token) {
       // Parse the comment from the position that we want to resolve. This should parse any function calls or compound decl names, the rest of
       // the comment will probably be parsed as garbage but that's OK because we don't actually care about it.
       let positionOffsetInToken = baseNamePosition.utf8Offset - token.position.utf8Offset
-      let commentTree = token.syntaxTextBytes[positionOffsetInToken...].withUnsafeBufferPointer { (buffer) -> ExprSyntax in
-        var parser = Parser(buffer)
-        return ExprSyntax.parse(from: &parser)
-      }
+      let triviaRangeEndOffsetInToken = triviaRange.upperBound.utf8Offset - token.position.utf8Offset
+      let commentTree = token.syntaxTextBytes[positionOffsetInToken..<triviaRangeEndOffsetInToken]
+        .withUnsafeBufferPointer { (buffer) -> ExprSyntax in
+          var parser = Parser(buffer)
+          return ExprSyntax.parse(from: &parser)
+        }
       // Run a new `NameMatcher`. Since the input of that name matcher is the text after the position to resolve, we
       // want to resolve the position at offset 0.
       let resolvedInComment = NameMatcher.resolve(baseNamePositions: [AbsolutePosition(utf8Offset: 0)], in: commentTree)
 
       let positionRemoved = removePositionToResolveIfExists(at: baseNamePosition)
-      precondition(positionRemoved, "Found a position with `firstPositionToResolve but didn't find it again to remove it?")
+      precondition(
+        positionRemoved,
+        "Found a position with `firstPositionToResolve but didn't find it again to remove it?"
+      )
 
       // Adjust the positions to point back to the original tree, set the context as `comment` and record them.
       resolvedLocs += resolvedInComment.map { locationInComment in
@@ -281,7 +312,7 @@ public class NameMatcher: SyntaxAnyVisitor {
           return .unlabeled(argument: Syntax(argument.secondName) ?? Syntax(argument.colon) ?? Syntax(argument.type))
         }
       }
-      addResolvedLocIfRequested(baseName: node.name, argumentLabels: .parameters(argumentLabels))
+      addResolvedLocIfRequested(baseName: node.name, argumentLabels: .enumCaseParameters(argumentLabels))
     }
     return .visitChildren
   }
@@ -376,7 +407,10 @@ public class NameMatcher: SyntaxAnyVisitor {
     let argumentLabels = node.parameterClause.parameters.map { (argument) -> DeclNameLocation.Argument in
       return .labeled(firstName: argument.firstName, secondName: argument.secondName)
     }
-    addResolvedLocIfRequested(baseName: node.subscriptKeyword, argumentLabels: .noncollapsibleParameters(argumentLabels))
+    addResolvedLocIfRequested(
+      baseName: node.subscriptKeyword,
+      argumentLabels: .noncollapsibleParameters(argumentLabels)
+    )
     return .visitChildren
   }
 }

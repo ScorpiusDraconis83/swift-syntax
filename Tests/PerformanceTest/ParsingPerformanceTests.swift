@@ -15,10 +15,10 @@ import SwiftSyntax
 import XCTest
 import _SwiftSyntaxTestSupport
 
-public class ParsingPerformanceTests: XCTestCase {
+class ParsingPerformanceTests: XCTestCase {
 
   var inputFile: URL {
-    return URL(fileURLWithPath: #file)
+    return URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .appendingPathComponent("Inputs")
       .appendingPathComponent("MinimalCollections.swift.input")
@@ -27,7 +27,7 @@ public class ParsingPerformanceTests: XCTestCase {
   func testNativeParsingPerformance() throws {
     try XCTSkipIf(longTestsDisabled)
 
-    let source = try String(contentsOf: inputFile)
+    let source = try String(contentsOf: inputFile, encoding: .utf8)
 
     try measureInstructions {
       _ = Parser.parse(source: source)

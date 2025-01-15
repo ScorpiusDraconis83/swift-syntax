@@ -27,7 +27,7 @@ public enum TriviaPosition {
 /// Each ``TokenSyntax`` can have multiple ``TriviaPiece``s as either leading or
 /// trailing trivia, which occur before or after the token’s content, respectively.
 /// ``Trivia`` represents a collection of these ``TriviaPiece``s
-public struct Trivia {
+public struct Trivia: Sendable {
   /// The pieces this trivia consists of. Each ``TriviaPiece`` can represent
   /// multiple characters, such as an entire comment or 4 spaces.
   public let pieces: [TriviaPiece]
@@ -140,9 +140,9 @@ extension Trivia: TextOutputStreamable {
   /// Prints the provided trivia as they would be written in a source file.
   ///
   /// - Parameter stream: The stream to which to print the trivia.
-  public func write(to target: inout some TextOutputStream) {
+  public func write(to stream: inout some TextOutputStream) {
     for piece in pieces {
-      piece.write(to: &target)
+      piece.write(to: &stream)
     }
   }
 }

@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension Parser {
   /// Consumes and returns all remaining tokens in the source file.
@@ -133,7 +137,7 @@ extension Parser {
     if let remainingTokens = remainingTokensIfMaximumNestingLevelReached() {
       return RawCodeBlockItemSyntax(
         remainingTokens,
-        item: .expr(RawExprSyntax(RawMissingExprSyntax(arena: self.arena))),
+        item: .init(expr: RawMissingExprSyntax(arena: self.arena)),
         semicolon: nil,
         arena: self.arena
       )
@@ -143,15 +147,13 @@ extension Parser {
       // Parse them and put them in their own CodeBlockItem but as an unexpected node.
       let switchCase = self.parseSwitchCase()
       return RawCodeBlockItemSyntax(
-        RawUnexpectedNodesSyntax(elements: [RawSyntax(switchCase)], arena: self.arena),
-        item: .expr(RawExprSyntax(RawMissingExprSyntax(arena: self.arena))),
+        RawUnexpectedNodesSyntax([switchCase], arena: self.arena),
+        item: .init(expr: RawMissingExprSyntax(arena: self.arena)),
         semicolon: nil,
         arena: self.arena
       )
     }
 
-    // FIXME: It is unfortunate that the Swift book refers to these as
-    // "statements" and not "items".
     let item = self.parseItem(isAtTopLevel: isAtTopLevel, allowInitDecl: allowInitDecl)
     let semi = self.consume(if: .semicolon)
     var trailingSemis: [RawTokenSyntax] = []
@@ -190,16 +192,14 @@ extension Parser {
         let (op, rhs) = parseUnresolvedAsExpr(
           handle: .init(spec: .keyword(.as))
         )
-        let sequence = RawExprSyntax(
-          RawSequenceExprSyntax(
-            elements: RawExprListSyntax(
-              elements: [expr, op, rhs],
-              arena: self.arena
-            ),
+        let sequence = RawSequenceExprSyntax(
+          elements: RawExprListSyntax(
+            elements: [expr, op, rhs],
             arena: self.arena
-          )
+          ),
+          arena: self.arena
         )
-        return .expr(sequence)
+        return .init(expr: sequence)
       }
     }
     return .stmt(stmt)
@@ -210,7 +210,10 @@ extension Parser {
   /// closing braces while trying to recover to the next item.
   /// If we are not at the top level, such a closing brace should close the
   /// wrapping declaration instead of being consumed by lookahead.
-  private mutating func parseItem(isAtTopLevel: Bool = false, allowInitDecl: Bool = true) -> RawCodeBlockItemSyntax.Item {
+  private mutating func parseItem(
+    isAtTopLevel: Bool = false,
+    allowInitDecl: Bool = true
+  ) -> RawCodeBlockItemSyntax.Item {
     if self.at(.poundIf) && !self.withLookahead({ $0.consumeIfConfigOfAttributes() }) {
       // If config of attributes is parsed as part of declaration parsing as it
       // doesn't constitute its own code block item.
@@ -232,9 +235,9 @@ extension Parser {
       } syntax: { parser, items in
         return .statements(RawCodeBlockItemListSyntax(elements: items, arena: parser.arena))
       }
-      return .decl(RawDeclSyntax(directive))
+      return .init(decl: directive)
     } else if self.at(.poundSourceLocation) {
-      return .decl(RawDeclSyntax(self.parsePoundSourceLocationDirective()))
+      return .init(decl: self.parsePoundSourceLocationDirective())
     } else if self.atStartOfDeclaration(isAtTopLevel: isAtTopLevel, allowInitDecl: allowInitDecl) {
       return .decl(self.parseDeclaration())
     } else if self.atStartOfStatement(preferExpr: false) {
@@ -246,7 +249,7 @@ extension Parser {
     } else if self.atStartOfStatement(allowRecovery: true, preferExpr: false) {
       return self.parseStatementItem()
     } else {
-      return .expr(RawExprSyntax(RawMissingExprSyntax(arena: self.arena)))
+      return .init(expr: RawMissingExprSyntax(arena: self.arena))
     }
   }
 }

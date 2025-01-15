@@ -10,13 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 /// A type that consumes  instances of ``TokenSyntax``.
 protocol TokenConsumer {
   associatedtype Token
   /// The current token syntax being examined by the consumer
   var currentToken: Lexer.Lexeme { get }
+
+  var swiftVersion: Parser.SwiftVersion { get }
 
   /// The experimental features that have been enabled.
   var experimentalFeatures: Parser.ExperimentalFeatures { get }
@@ -132,7 +138,9 @@ extension TokenConsumer {
   /// If this is the case, return the `Subset` case that the parser is positioned in
   /// as well as a handle to consume that token.
   @inline(__always)
-  mutating func at<SpecSet: TokenSpecSet>(anyIn specSet: SpecSet.Type) -> (spec: SpecSet, handle: TokenConsumptionHandle)? {
+  mutating func at<SpecSet: TokenSpecSet>(
+    anyIn specSet: SpecSet.Type
+  ) -> (spec: SpecSet, handle: TokenConsumptionHandle)? {
     #if SWIFTPARSER_ENABLE_ALTERNATE_TOKEN_INTROSPECTION
     if shouldRecordAlternativeTokenChoices {
       recordAlternativeTokenChoice(for: self.currentToken, choices: specSet.allCases.map(\.spec))
@@ -369,6 +377,9 @@ extension TokenConsumer {
       default:
         return false
       }
+
+    case .prefixOperator where lexeme.isContextualPunctuator("~"):
+      return true
 
     default:
       return false

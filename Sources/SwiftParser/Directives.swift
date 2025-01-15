@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+@_spi(RawSyntax) internal import SwiftSyntax
+#else
 @_spi(RawSyntax) import SwiftSyntax
+#endif
 
 extension Parser {
   private enum IfConfigContinuationClauseStartKeyword: TokenSpecSet {
@@ -54,7 +58,8 @@ extension Parser {
   ///             into a syntax collection.
   mutating func parsePoundIfDirective<Element: RawSyntaxNodeProtocol>(
     _ parseElement: (_ parser: inout Parser, _ isFirstElement: Bool) -> Element?,
-    addSemicolonIfNeeded: (_ lastElement: Element, _ newItemAtStartOfLine: Bool, _ parser: inout Parser) -> Element? = { _, _, _ in nil },
+    addSemicolonIfNeeded:
+      (_ lastElement: Element, _ newItemAtStartOfLine: Bool, _ parser: inout Parser) -> Element? = { _, _, _ in nil },
     syntax: (inout Parser, [Element]) -> RawIfConfigClauseSyntax.Elements?
   ) -> RawIfConfigDeclSyntax {
     if let remainingTokens = remainingTokensIfMaximumNestingLevelReached() {
@@ -70,7 +75,7 @@ extension Parser {
 
     // Parse #if
     let (unexpectedBeforePoundIf, poundIf) = self.expect(.poundIf)
-    let condition = RawExprSyntax(self.parseSequenceExpression(flavor: .poundIfDirective))
+    let condition = self.parseSequenceExpression(flavor: .poundIfDirective)
     let unexpectedBetweenConditionAndElements = self.consumeRemainingTokenOnLine()
 
     clauses.append(
@@ -86,7 +91,9 @@ extension Parser {
 
     // Proceed to parse #if continuation clauses (#elseif, #else, check #elif typo, #endif)
     var loopProgress = LoopProgressCondition()
-    LOOP: while let (match, handle) = self.canRecoverTo(anyIn: IfConfigContinuationClauseStartKeyword.self), self.hasProgressed(&loopProgress) {
+    LOOP: while let (match, handle) = self.canRecoverTo(anyIn: IfConfigContinuationClauseStartKeyword.self),
+      self.hasProgressed(&loopProgress)
+    {
       var unexpectedBeforePound: RawUnexpectedNodesSyntax?
       var pound: RawTokenSyntax
       let condition: RawExprSyntax?
@@ -95,14 +102,19 @@ extension Parser {
       switch match {
       case .poundElseif:
         (unexpectedBeforePound, pound) = self.eat(handle)
-        condition = RawExprSyntax(self.parseSequenceExpression(flavor: .poundIfDirective))
+        condition = self.parseSequenceExpression(flavor: .poundIfDirective)
         unexpectedBetweenConditionAndElements = self.consumeRemainingTokenOnLine()
       case .poundElse:
         (unexpectedBeforePound, pound) = self.eat(handle)
         if let ifToken = self.consume(if: .init(.if, allowAtStartOfLine: false)) {
-          unexpectedBeforePound = RawUnexpectedNodesSyntax(combining: unexpectedBeforePound, pound, ifToken, arena: self.arena)
+          unexpectedBeforePound = RawUnexpectedNodesSyntax(
+            combining: unexpectedBeforePound,
+            pound,
+            ifToken,
+            arena: self.arena
+          )
           pound = self.missingToken(.poundElseif)
-          condition = RawExprSyntax(self.parseSequenceExpression(flavor: .poundIfDirective))
+          condition = self.parseSequenceExpression(flavor: .poundIfDirective)
         } else {
           condition = nil
         }
@@ -113,9 +125,14 @@ extension Parser {
           guard let elif = self.consume(if: TokenSpec(.identifier, allowAtStartOfLine: false)) else {
             preconditionFailure("The current token should be an identifier, guaranteed by the `atElifTypo` check.")
           }
-          unexpectedBeforePound = RawUnexpectedNodesSyntax(combining: unexpectedBeforePound, pound, elif, arena: self.arena)
+          unexpectedBeforePound = RawUnexpectedNodesSyntax(
+            combining: unexpectedBeforePound,
+            pound,
+            elif,
+            arena: self.arena
+          )
           pound = self.missingToken(.poundElseif)
-          condition = RawExprSyntax(self.parseSequenceExpression(flavor: .poundIfDirective))
+          condition = self.parseSequenceExpression(flavor: .poundIfDirective)
           unexpectedBetweenConditionAndElements = self.consumeRemainingTokenOnLine()
         } else {
           break LOOP
@@ -128,7 +145,10 @@ extension Parser {
           poundKeyword: pound,
           condition: condition,
           unexpectedBetweenConditionAndElements,
-          elements: syntax(&self, parseIfConfigClauseElements(parseElement, addSemicolonIfNeeded: addSemicolonIfNeeded)),
+          elements: syntax(
+            &self,
+            parseIfConfigClauseElements(parseElement, addSemicolonIfNeeded: addSemicolonIfNeeded)
+          ),
           arena: self.arena
         )
       )
@@ -178,7 +198,9 @@ extension Parser {
       guard let element = parseElement(&self, elements.isEmpty), !element.isEmpty else {
         break
       }
-      if let lastElement = elements.last, let fixedUpLastItem = addSemicolonIfNeeded(lastElement, newItemAtStartOfLine, &self) {
+      if let lastElement = elements.last,
+        let fixedUpLastItem = addSemicolonIfNeeded(lastElement, newItemAtStartOfLine, &self)
+      {
         elements[elements.count - 1] = fixedUpLastItem
       }
       elements.append(element)

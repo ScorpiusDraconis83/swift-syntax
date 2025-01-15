@@ -16,7 +16,7 @@ import XCTest
 fileprivate func assertNoFailures(
   _ failures: [ValidationFailure],
   message: String,
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   if failures.isEmpty {
@@ -37,7 +37,7 @@ fileprivate func assertNoFailures(
 fileprivate func assertFailuresMatchXFails(
   _ failures: [ValidationFailure],
   expectedFailures: [ValidationFailure],
-  file: StaticString = #file,
+  file: StaticString = #filePath,
   line: UInt = #line
 ) {
   let matchedXFails = expectedFailures.filter { failures.contains($0) }
@@ -53,7 +53,7 @@ fileprivate extension ChildKind {
     switch (self, other) {
     case (.node(let kind), .node(kind: let otherKind)):
       return kind == otherKind
-    case (.nodeChoices(let choices), .nodeChoices(let otherChoices)):
+    case (.nodeChoices(let choices, _), .nodeChoices(let otherChoices, _)):
       return choices.count == otherChoices.count && zip(choices, otherChoices).allSatisfy { $0.hasSameType(as: $1) }
     case (.collection(kind: let kind, _, _, _), .collection(kind: let otherKind, _, _, _)):
       return kind == otherKind
@@ -71,7 +71,7 @@ fileprivate extension ChildKind {
   var isCollection: Bool {
     switch self {
     case .node: return false
-    case .nodeChoices(let choices): return choices.contains(where: { $0.kind.isCollection })
+    case .nodeChoices(let choices, _): return choices.contains(where: { $0.kind.isCollection })
     case .collection: return true
     case .token: return false
     }
@@ -80,12 +80,14 @@ fileprivate extension ChildKind {
 
 fileprivate extension Child {
   func hasSameType(as other: Child) -> Bool {
-    return varOrCaseName.description == other.varOrCaseName.description && kind.hasSameType(as: other.kind) && isOptional == other.isOptional
+    return identifier.description == other.identifier.description && kind.hasSameType(as: other.kind)
+      && isOptional == other.isOptional
   }
 
   func isFollowedByColonToken(in node: LayoutNode) -> Bool {
-    guard let childIndex = node.children.firstIndex(where: { $0.varOrCaseName.description == self.varOrCaseName.description }) else {
-      preconditionFailure("\(self.varOrCaseName) is not a child of \(node.kind.syntaxType)")
+    let childIndex = node.children.firstIndex(where: { $0.identifier.description == self.identifier.description })
+    guard let childIndex else {
+      preconditionFailure("\(self.identifier) is not a child of \(node.kind.syntaxType)")
     }
     guard childIndex + 2 < node.children.count else {
       return false
@@ -121,7 +123,11 @@ class ValidateSyntaxNodes: XCTestCase {
     for node in SYNTAX_NODES where node.base != .syntaxCollection {
       if !node.kind.syntaxType.description.hasSuffix(node.base.syntaxType.description) {
         failures.append(
-          ValidationFailure(node: node.kind, message: "has base kind '\(node.base.syntaxType)' but type name doesn’t have '\(node.base.syntaxType)' suffix")
+          ValidationFailure(
+            node: node.kind,
+            message:
+              "has base kind '\(node.base.syntaxType)' but type name doesn’t have '\(node.base.syntaxType)' suffix"
+          )
         )
       }
     }
@@ -129,8 +135,14 @@ class ValidateSyntaxNodes: XCTestCase {
     assertFailuresMatchXFails(
       failures,
       expectedFailures: [
-        ValidationFailure(node: .canImportVersionInfo, message: "has base kind 'ExprSyntax' but type name doesn’t have 'ExprSyntax' suffix"),
-        ValidationFailure(node: .poundSourceLocation, message: "has base kind 'DeclSyntax' but type name doesn’t have 'DeclSyntax' suffix"),
+        ValidationFailure(
+          node: ._canImportVersionInfo,
+          message: "has base kind 'ExprSyntax' but type name doesn’t have 'ExprSyntax' suffix"
+        ),
+        ValidationFailure(
+          node: .poundSourceLocation,
+          message: "has base kind 'DeclSyntax' but type name doesn’t have 'DeclSyntax' suffix"
+        ),
       ]
     )
   }
@@ -169,13 +181,14 @@ class ValidateSyntaxNodes: XCTestCase {
       let keywordName = keyword.spec.name
 
       if child.isFollowedByColonToken(in: node) {
-        if child.varOrCaseName.description != "\(keywordName)Label" {
+        if child.identifier.description != "\(keywordName)Label" {
           return
-            "child '\(child.varOrCaseName)' has a single keyword as its only token choice and is followed by a colon. It should thus be named '\(keywordName)Label'"
+            "child '\(child.identifier)' has a single keyword as its only token choice and is followed by a colon. It should thus be named '\(keywordName)Label'"
         }
       } else {
-        if child.varOrCaseName.description != "\(keywordName)Keyword" {
-          return "child '\(child.varOrCaseName)' has a single keyword as its only token choice and should thus be named '\(keywordName)Keyword'"
+        if child.identifier.description != "\(keywordName)Keyword" {
+          return
+            "child '\(child.identifier)' has a single keyword as its only token choice and should thus be named '\(keywordName)Keyword'"
         }
       }
 
@@ -183,20 +196,22 @@ class ValidateSyntaxNodes: XCTestCase {
       // We allow arbitrary naming of identifiers and literals
       break
     case .token(.comma):
-      if child.varOrCaseName.description != "trailingComma" && child.varOrCaseName.description != "comma" {
-        return "child '\(child.varOrCaseName)' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
+      if child.identifier.description != "trailingComma" && child.identifier.description != "comma" {
+        return
+          "child '\(child.identifier)' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
       }
     case .token(let token):
       let expectedChildName =
-        token.spec.varOrCaseName.text
+        token.spec.identifier.text
         .dropSuffix("Token")
         .dropPrefix("prefix")
         .dropPrefix("infix")
         .dropPrefix("postfix")
         .dropPrefix("binary")
         .withFirstCharacterLowercased
-      if child.varOrCaseName.description != expectedChildName {
-        return "child '\(child.varOrCaseName)' has a token as its only token choice and should thus be named '\(expectedChildName)'"
+      if child.identifier.description != expectedChildName {
+        return
+          "child '\(child.identifier)' has a token as its only token choice and should thus be named '\(expectedChildName)'"
       }
     }
     return nil
@@ -222,17 +237,20 @@ class ValidateSyntaxNodes: XCTestCase {
         // Even though these nodes only accept e.g. 'async' name them consistently with properties that accept 'async' and 'reasync'
         ValidationFailure(
           node: .accessorEffectSpecifiers,
-          message: "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
+          message:
+            "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
             // To be consistent with AsyncSpecifier properties that can be both 'async' and 'reasync'
         ),
         ValidationFailure(
           node: .deinitializerEffectSpecifiers,
-          message: "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
+          message:
+            "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
             // To be consistent with AsyncSpecifier properties that can be both 'async' and 'reasync'
         ),
         ValidationFailure(
           node: .typeEffectSpecifiers,
-          message: "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
+          message:
+            "child 'asyncSpecifier' has a single keyword as its only token choice and should thus be named 'asyncKeyword'"
             // To be consistent with AsyncSpecifier properties that can be both 'async' and 'reasync'
         ),
 
@@ -240,11 +258,13 @@ class ValidateSyntaxNodes: XCTestCase {
         // If there are two tokens of the same kind in a node, we can't follow the naming rule without conflict
         ValidationFailure(
           node: .differentiableAttributeArguments,
-          message: "child 'kindSpecifierComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
+          message:
+            "child 'kindSpecifierComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
         ),
         ValidationFailure(
           node: .differentiableAttributeArguments,
-          message: "child 'argumentsComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
+          message:
+            "child 'argumentsComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
         ),
         ValidationFailure(
           node: .poundSourceLocationArguments,
@@ -257,7 +277,8 @@ class ValidateSyntaxNodes: XCTestCase {
         ),
         ValidationFailure(
           node: .regexLiteralExpr,
-          message: "child 'openingPounds' has a token as its only token choice and should thus be named 'regexPoundDelimiter'"
+          message:
+            "child 'openingPounds' has a token as its only token choice and should thus be named 'regexPoundDelimiter'"
         ),
         ValidationFailure(
           node: .regexLiteralExpr,
@@ -270,30 +291,32 @@ class ValidateSyntaxNodes: XCTestCase {
         ),
         ValidationFailure(
           node: .regexLiteralExpr,
-          message: "child 'closingPounds' has a token as its only token choice and should thus be named 'regexPoundDelimiter'"
+          message:
+            "child 'closingPounds' has a token as its only token choice and should thus be named 'regexPoundDelimiter'"
             // There are the opening and closing ExtendedRegexDelimiter in the node
         ),
         // We should explicitly mention token here because it’s not obvious that the end of a file is represented by a token
-        ValidationFailure(node: .sourceFile, message: "child 'endOfFileToken' has a token as its only token choice and should thus be named 'endOfFile'"),
         ValidationFailure(
-          node: .stringLiteralExpr,
-          message: "child 'openingPounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
+          node: .sourceFile,
+          message: "child 'endOfFileToken' has a token as its only token choice and should thus be named 'endOfFile'"
         ),
         ValidationFailure(
           node: .stringLiteralExpr,
-          message: "child 'closingPounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
+          message:
+            "child 'openingPounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
+        ),
+        ValidationFailure(
+          node: .stringLiteralExpr,
+          message:
+            "child 'closingPounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
         ),
         ValidationFailure(
           node: .expressionSegment,
-          message: "child 'pounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
+          message:
+            "child 'pounds' has a token as its only token choice and should thus be named 'rawStringPoundDelimiter'"
         ),
 
         // MARK: Tokens that contain underscores
-        ValidationFailure(
-          node: .borrowExpr,
-          message: "child 'borrowKeyword' has a single keyword as its only token choice and should thus be named '_borrowKeyword'"
-            // _borrow is underscored and thus BorrowKeyword is the correct spelling
-        ),
         ValidationFailure(
           node: .conventionWitnessMethodAttributeArguments,
           message:
@@ -318,7 +341,8 @@ class ValidateSyntaxNodes: XCTestCase {
         // This is the only place where we use LeadingComma, similar to 'TrailingComma'
         ValidationFailure(
           node: .designatedType,
-          message: "child 'leadingComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
+          message:
+            "child 'leadingComma' has a comma keyword as its only token choice and should thus be named 'comma' or 'trailingComma'"
         ),
         // This is similar to `TrailingComma`
         ValidationFailure(
@@ -333,7 +357,8 @@ class ValidateSyntaxNodes: XCTestCase {
         // default is not a function argument label here but a proper keyword
         ValidationFailure(
           node: .switchDefaultLabel,
-          message: "child 'defaultKeyword' has a single keyword as its only token choice and is followed by a colon. It should thus be named 'defaultLabel'"
+          message:
+            "child 'defaultKeyword' has a single keyword as its only token choice and is followed by a colon. It should thus be named 'defaultLabel'"
         ),
       ]
     )
@@ -354,12 +379,14 @@ class ValidateSyntaxNodes: XCTestCase {
         }
         var failureMessage: String?
         if child.isFollowedByColonToken(in: node) {
-          if child.varOrCaseName.description != "label" && !child.varOrCaseName.description.hasSuffix("Label") {
-            failureMessage = "child '\(child.varOrCaseName)' only has keywords as its token choices, is followed by a colon and should thus end with 'Label'"
+          if child.identifier.description != "label" && !child.identifier.description.hasSuffix("Label") {
+            failureMessage =
+              "child '\(child.identifier)' only has keywords as its token choices, is followed by a colon and should thus end with 'Label'"
           }
         } else {
-          if child.varOrCaseName.description != "specifier" && !child.varOrCaseName.description.hasSuffix("Specifier") {
-            failureMessage = "child '\(child.varOrCaseName)' only has keywords as its token choices and should thus end with 'Specifier'"
+          if child.identifier.description != "specifier" && !child.identifier.description.hasSuffix("Specifier") {
+            failureMessage =
+              "child '\(child.identifier)' only has keywords as its token choices and should thus end with 'Specifier'"
           }
         }
         if let failureMessage {
@@ -377,7 +404,11 @@ class ValidateSyntaxNodes: XCTestCase {
           message: "child 'consumeKeyword' only has keywords as its token choices and should thus end with 'Specifier'"
             // ConsumeKeyword can be 'consume' or '_move' and '_move' is deprecated
         ),
-
+        ValidationFailure(
+          node: .borrowExpr,
+          message: "child 'borrowKeyword' only has keywords as its token choices and should thus end with 'Specifier'"
+            // BorrowKeyword can be 'borrow' or '_borrow', eventually '_borrow' will be deprecated
+        ),
         // MARK: Conceptually a value, not a specifier
         ValidationFailure(
           node: .booleanLiteralExpr,
@@ -424,17 +455,17 @@ class ValidateSyntaxNodes: XCTestCase {
     }
 
     for (kind, children) in childrenByNodeKind where !kind.isBase && kind != .token && kind != .stringLiteralExpr {
-      let childNames = children.map(\.child.varOrCaseName.description)
+      let childNames = children.map(\.child.identifier.description)
       let mostCommonChildName = childNames.mostCommon!
-      let mostCommonChild = children.first(where: { $0.child.varOrCaseName.description == mostCommonChildName })!
+      let mostCommonChild = children.first(where: { $0.child.identifier.description == mostCommonChildName })!
 
       for (node, child) in children {
-        if child.varOrCaseName.description != mostCommonChildName {
+        if child.identifier.description != mostCommonChildName {
           failures.append(
             ValidationFailure(
               node: node.kind,
               message:
-                "child '\(child.varOrCaseName)' is named inconsistently with '\(mostCommonChild.node.kind.syntaxType).\(mostCommonChildName)', which has the same type ('\(kind.syntaxType)')"
+                "child '\(child.identifier)' is named inconsistently with '\(mostCommonChild.node.kind.syntaxType).\(mostCommonChildName)', which has the same type ('\(kind.syntaxType)')"
             )
           )
         }
@@ -449,27 +480,28 @@ class ValidateSyntaxNodes: XCTestCase {
         ValidationFailure(
           node: .enumCaseElement,
           message:
-            "child 'rawValue' is named inconsistently with 'MatchingPatternConditionSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
+            "child 'rawValue' is named inconsistently with 'ClosureCaptureSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
         ),
         ValidationFailure(
           node: .enumCaseParameter,
           message:
-            "child 'defaultValue' is named inconsistently with 'MatchingPatternConditionSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
+            "child 'defaultValue' is named inconsistently with 'ClosureCaptureSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
         ),
         ValidationFailure(
           node: .functionParameter,
           message:
-            "child 'defaultValue' is named inconsistently with 'MatchingPatternConditionSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
+            "child 'defaultValue' is named inconsistently with 'ClosureCaptureSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
         ),
         ValidationFailure(
           node: .macroDecl,
           message:
-            "child 'definition' is named inconsistently with 'MatchingPatternConditionSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
+            "child 'definition' is named inconsistently with 'ClosureCaptureSyntax.initializer', which has the same type ('InitializerClauseSyntax')"
         ),
         // MARK: Miscellaneous
         ValidationFailure(
           node: .multipleTrailingClosureElement,
-          message: "child 'closure' is named inconsistently with 'FunctionCallExprSyntax.trailingClosure', which has the same type ('ClosureExprSyntax')"
+          message:
+            "child 'closure' is named inconsistently with 'FunctionCallExprSyntax.trailingClosure', which has the same type ('ClosureExprSyntax')"
         ),
       ]
     )
@@ -501,15 +533,22 @@ class ValidateSyntaxNodes: XCTestCase {
       expectedFailures: [
         ValidationFailure(node: .accessorParameters, message: "could conform to trait 'NamedDecl' but does not"),
         ValidationFailure(node: .availabilityCondition, message: "could conform to trait 'Parenthesized' but does not"),
-        ValidationFailure(node: .canImportExpr, message: "could conform to trait 'Parenthesized' but does not"),
-        ValidationFailure(node: .differentiabilityArguments, message: "could conform to trait 'Parenthesized' but does not"),
+        ValidationFailure(node: ._canImportExpr, message: "could conform to trait 'Parenthesized' but does not"),
+        ValidationFailure(
+          node: .differentiabilityArguments,
+          message: "could conform to trait 'Parenthesized' but does not"
+        ),
         ValidationFailure(node: .editorPlaceholderDecl, message: "could conform to trait 'MissingNode' but does not"),
         ValidationFailure(node: .editorPlaceholderExpr, message: "could conform to trait 'MissingNode' but does not"),
         ValidationFailure(node: .enumCaseElement, message: "could conform to trait 'NamedDecl' but does not"),
         ValidationFailure(node: .genericParameter, message: "could conform to trait 'NamedDecl' but does not"),
         ValidationFailure(node: .precedenceGroupName, message: "could conform to trait 'NamedDecl' but does not"),
         ValidationFailure(node: .primaryAssociatedType, message: "could conform to trait 'NamedDecl' but does not"),
-        ValidationFailure(node: .yieldedExpressionsClause, message: "could conform to trait 'Parenthesized' but does not"),
+        ValidationFailure(
+          node: .yieldedExpressionsClause,
+          message: "could conform to trait 'Parenthesized' but does not"
+        ),
+        ValidationFailure(node: .lifetimeTypeSpecifier, message: "could conform to trait 'Parenthesized' but does not"),
       ]
     )
   }
@@ -519,11 +558,11 @@ class ValidateSyntaxNodes: XCTestCase {
 
     for node in SYNTAX_NODES.compactMap(\.layoutNode) {
       for child in node.nonUnexpectedChildren {
-        if child.varOrCaseName.description.hasSuffix("Token") {
+        if child.identifier.description.hasSuffix("Token") {
           failures.append(
             ValidationFailure(
               node: node.kind,
-              message: "child '\(child.varOrCaseName)' should not end with 'Token'"
+              message: "child '\(child.identifier)' should not end with 'Token'"
             )
           )
         }
@@ -566,11 +605,11 @@ class ValidateSyntaxNodes: XCTestCase {
 
     for node in SYNTAX_NODES.compactMap(\.layoutNode) {
       for child in node.nonUnexpectedChildren where child.kind.isCollection {
-        if !child.varOrCaseName.description.hasSuffix("s") {
+        if !child.identifier.description.hasSuffix("s") {
           failures.append(
             ValidationFailure(
               node: node.kind,
-              message: "child '\(child.varOrCaseName)' is a collection and should thus be named as a plural"
+              message: "child '\(child.identifier)' is a collection and should thus be named as a plural"
             )
           )
         }
@@ -581,7 +620,10 @@ class ValidateSyntaxNodes: XCTestCase {
       failures,
       expectedFailures: [
         // The child is singular here, the path just consists of multiple components
-        ValidationFailure(node: .importDecl, message: "child 'path' is a collection and should thus be named as a plural")
+        ValidationFailure(
+          node: .importDecl,
+          message: "child 'path' is a collection and should thus be named as a plural"
+        )
       ]
     )
   }
@@ -592,11 +634,13 @@ class ValidateSyntaxNodes: XCTestCase {
 
     for node in SYNTAX_NODES.compactMap(\.layoutNode) {
       for child in node.nonUnexpectedChildren {
-        if child.varOrCaseName.description.contains("identifier") || child.varOrCaseName.description.contains("Identifier") {
+        if child.identifier.description.contains("identifier")
+          || child.identifier.description.contains("Identifier")
+        {
           failures.append(
             ValidationFailure(
               node: node.kind,
-              message: "child '\(child.varOrCaseName)' should generally not contain 'Identifier'"
+              message: "child '\(child.identifier)' should generally not contain 'Identifier'"
             )
           )
         }
@@ -607,7 +651,10 @@ class ValidateSyntaxNodes: XCTestCase {
       failures,
       expectedFailures: [
         // The identifier expr / pattern nodes do actually have a child that’s the identifier
-        ValidationFailure(node: .identifierPattern, message: "child 'identifier' should generally not contain 'Identifier'")
+        ValidationFailure(
+          node: .identifierPattern,
+          message: "child 'identifier' should generally not contain 'Identifier'"
+        )
       ]
     )
   }
@@ -639,16 +686,20 @@ class ValidateSyntaxNodes: XCTestCase {
   func testChildrenDontEndWithNodeKind() {
     var failures: [ValidationFailure] = []
 
-    let forbiddenSuffixes = ["Decl", "Declaration", "Expr", "Expression", "Pattern", "Stmt", "Statement", "Syntax", "Type"]
+    let forbiddenSuffixes = [
+      "Decl", "Declaration", "Expr", "Expression", "Pattern", "Stmt", "Statement", "Syntax", "Type",
+    ]
 
     for node in SYNTAX_NODES.compactMap(\.layoutNode) {
       for child in node.nonUnexpectedChildren {
         for forbiddenSuffix in forbiddenSuffixes {
-          if child.varOrCaseName.description.hasSuffix(forbiddenSuffix) && child.varOrCaseName.description != forbiddenSuffix.withFirstCharacterLowercased {
+          if child.identifier.description.hasSuffix(forbiddenSuffix)
+            && child.identifier.description != forbiddenSuffix.withFirstCharacterLowercased
+          {
             failures.append(
               ValidationFailure(
                 node: node.kind,
-                message: "child '\(child.varOrCaseName)' should not end with '\(forbiddenSuffix)'"
+                message: "child '\(child.identifier)' should not end with '\(forbiddenSuffix)'"
               )
             )
           }
@@ -666,18 +717,30 @@ class ValidateSyntaxNodes: XCTestCase {
         ValidationFailure(node: .conformanceRequirement, message: "child 'rightType' should not end with 'Type'"),
         ValidationFailure(node: .extensionDecl, message: "child 'extendedType' should not end with 'Type'"),
         ValidationFailure(node: .genericParameter, message: "child 'inheritedType' should not end with 'Type'"),
-        ValidationFailure(node: .implicitlyUnwrappedOptionalType, message: "child 'wrappedType' should not end with 'Type'"),
+        ValidationFailure(
+          node: .implicitlyUnwrappedOptionalType,
+          message: "child 'wrappedType' should not end with 'Type'"
+        ),
         ValidationFailure(node: .memberType, message: "child 'baseType' should not end with 'Type'"),
         ValidationFailure(node: .metatypeType, message: "child 'baseType' should not end with 'Type'"),
         ValidationFailure(node: .optionalType, message: "child 'wrappedType' should not end with 'Type'"),
         ValidationFailure(node: .sameTypeRequirement, message: "child 'leftType' should not end with 'Type'"),
         ValidationFailure(node: .sameTypeRequirement, message: "child 'rightType' should not end with 'Type'"),
         // MARK: Adjective + Expr
-        ValidationFailure(node: .functionCallExpr, message: "child 'calledExpression' should not end with 'Expression'"),
-        ValidationFailure(node: .subscriptCallExpr, message: "child 'calledExpression' should not end with 'Expression'"),
+        ValidationFailure(
+          node: .functionCallExpr,
+          message: "child 'calledExpression' should not end with 'Expression'"
+        ),
+        ValidationFailure(
+          node: .subscriptCallExpr,
+          message: "child 'calledExpression' should not end with 'Expression'"
+        ),
         ValidationFailure(node: .ternaryExpr, message: "child 'thenExpression' should not end with 'Expression'"),
         ValidationFailure(node: .ternaryExpr, message: "child 'elseExpression' should not end with 'Expression'"),
-        ValidationFailure(node: .unresolvedTernaryExpr, message: "child 'thenExpression' should not end with 'Expression'"),
+        ValidationFailure(
+          node: .unresolvedTernaryExpr,
+          message: "child 'thenExpression' should not end with 'Expression'"
+        ),
         // MARK: Other
         // Even though the repetition pattern is not a PatternSyntax, pattern is the correct term here
         ValidationFailure(node: .packExpansionExpr, message: "child 'repetitionPattern' should not end with 'Pattern'"),
@@ -755,7 +818,8 @@ class ValidateSyntaxNodes: XCTestCase {
           failures.append(
             ValidationFailure(
               node: node.kind,
-              message: "child '\(child.name)' is an optional syntax collection. All syntax collections should be non-optional."
+              message:
+                "child '\(child.name)' is an optional syntax collection. All syntax collections should be non-optional."
             )
           )
         }

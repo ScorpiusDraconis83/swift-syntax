@@ -13,8 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 /// Enum to exhaustively switch over all different syntax nodes.
-public enum SyntaxEnum {
+public enum SyntaxEnum: Sendable {
   case token(TokenSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case abiAttributeArguments(ABIAttributeArgumentsSyntax)
   case accessorBlock(AccessorBlockSyntax)
   case accessorDeclList(AccessorDeclListSyntax)
   case accessorDecl(AccessorDeclSyntax)
@@ -42,8 +46,8 @@ public enum SyntaxEnum {
   case booleanLiteralExpr(BooleanLiteralExprSyntax)
   case borrowExpr(BorrowExprSyntax)
   case breakStmt(BreakStmtSyntax)
-  case canImportExpr(CanImportExprSyntax)
-  case canImportVersionInfo(CanImportVersionInfoSyntax)
+  case _canImportExpr(_CanImportExprSyntax)
+  case _canImportVersionInfo(_CanImportVersionInfoSyntax)
   case catchClauseList(CatchClauseListSyntax)
   case catchClause(CatchClauseSyntax)
   case catchItemList(CatchItemListSyntax)
@@ -178,6 +182,18 @@ public enum SyntaxEnum {
   case labeledSpecializeArgument(LabeledSpecializeArgumentSyntax)
   case labeledStmt(LabeledStmtSyntax)
   case layoutRequirement(LayoutRequirementSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeSpecifierArgumentList(LifetimeSpecifierArgumentListSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeSpecifierArgument(LifetimeSpecifierArgumentSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case lifetimeTypeSpecifier(LifetimeTypeSpecifierSyntax)
   case macroDecl(MacroDeclSyntax)
   case macroExpansionDecl(MacroExpansionDeclSyntax)
   case macroExpansionExpr(MacroExpansionExprSyntax)
@@ -241,6 +257,7 @@ public enum SyntaxEnum {
   case sequenceExpr(SequenceExprSyntax)
   case simpleStringLiteralExpr(SimpleStringLiteralExprSyntax)
   case simpleStringLiteralSegmentList(SimpleStringLiteralSegmentListSyntax)
+  case simpleTypeSpecifier(SimpleTypeSpecifierSyntax)
   case someOrAnyType(SomeOrAnyTypeSyntax)
   case sourceFile(SourceFileSyntax)
   case specializeAttributeArgumentList(SpecializeAttributeArgumentListSyntax)
@@ -281,12 +298,17 @@ public enum SyntaxEnum {
   case typeEffectSpecifiers(TypeEffectSpecifiersSyntax)
   case typeExpr(TypeExprSyntax)
   case typeInitializerClause(TypeInitializerClauseSyntax)
+  case typeSpecifierList(TypeSpecifierListSyntax)
   case unavailableFromAsyncAttributeArguments(UnavailableFromAsyncAttributeArgumentsSyntax)
   case underscorePrivateAttributeArguments(UnderscorePrivateAttributeArgumentsSyntax)
   case unexpectedNodes(UnexpectedNodesSyntax)
   case unresolvedAsExpr(UnresolvedAsExprSyntax)
   case unresolvedIsExpr(UnresolvedIsExprSyntax)
   case unresolvedTernaryExpr(UnresolvedTernaryExprSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case unsafeExpr(UnsafeExprSyntax)
   case valueBindingPattern(ValueBindingPatternSyntax)
   case variableDecl(VariableDeclSyntax)
   case versionComponentList(VersionComponentListSyntax)
@@ -301,12 +323,14 @@ public enum SyntaxEnum {
   case yieldedExpressionsClause(YieldedExpressionsClauseSyntax)
 }
 
-public extension Syntax {
+extension Syntax {
   /// Get an enum that can be used to exhaustively switch over all syntax nodes.
-  func `as`(_: SyntaxEnum.Type) -> SyntaxEnum {
+  public func `as`(_: SyntaxEnum.Type) -> SyntaxEnum {
     switch raw.kind {
     case .token:
       return .token(TokenSyntax(self)!)
+    case .abiAttributeArguments:
+      return .abiAttributeArguments(ABIAttributeArgumentsSyntax(self)!)
     case .accessorBlock:
       return .accessorBlock(AccessorBlockSyntax(self)!)
     case .accessorDeclList:
@@ -361,10 +385,10 @@ public extension Syntax {
       return .borrowExpr(BorrowExprSyntax(self)!)
     case .breakStmt:
       return .breakStmt(BreakStmtSyntax(self)!)
-    case .canImportExpr:
-      return .canImportExpr(CanImportExprSyntax(self)!)
-    case .canImportVersionInfo:
-      return .canImportVersionInfo(CanImportVersionInfoSyntax(self)!)
+    case ._canImportExpr:
+      return ._canImportExpr(_CanImportExprSyntax(self)!)
+    case ._canImportVersionInfo:
+      return ._canImportVersionInfo(_CanImportVersionInfoSyntax(self)!)
     case .catchClauseList:
       return .catchClauseList(CatchClauseListSyntax(self)!)
     case .catchClause:
@@ -627,6 +651,12 @@ public extension Syntax {
       return .labeledStmt(LabeledStmtSyntax(self)!)
     case .layoutRequirement:
       return .layoutRequirement(LayoutRequirementSyntax(self)!)
+    case .lifetimeSpecifierArgumentList:
+      return .lifetimeSpecifierArgumentList(LifetimeSpecifierArgumentListSyntax(self)!)
+    case .lifetimeSpecifierArgument:
+      return .lifetimeSpecifierArgument(LifetimeSpecifierArgumentSyntax(self)!)
+    case .lifetimeTypeSpecifier:
+      return .lifetimeTypeSpecifier(LifetimeTypeSpecifierSyntax(self)!)
     case .macroDecl:
       return .macroDecl(MacroDeclSyntax(self)!)
     case .macroExpansionDecl:
@@ -753,6 +783,8 @@ public extension Syntax {
       return .simpleStringLiteralExpr(SimpleStringLiteralExprSyntax(self)!)
     case .simpleStringLiteralSegmentList:
       return .simpleStringLiteralSegmentList(SimpleStringLiteralSegmentListSyntax(self)!)
+    case .simpleTypeSpecifier:
+      return .simpleTypeSpecifier(SimpleTypeSpecifierSyntax(self)!)
     case .someOrAnyType:
       return .someOrAnyType(SomeOrAnyTypeSyntax(self)!)
     case .sourceFile:
@@ -827,6 +859,8 @@ public extension Syntax {
       return .typeExpr(TypeExprSyntax(self)!)
     case .typeInitializerClause:
       return .typeInitializerClause(TypeInitializerClauseSyntax(self)!)
+    case .typeSpecifierList:
+      return .typeSpecifierList(TypeSpecifierListSyntax(self)!)
     case .unavailableFromAsyncAttributeArguments:
       return .unavailableFromAsyncAttributeArguments(UnavailableFromAsyncAttributeArgumentsSyntax(self)!)
     case .underscorePrivateAttributeArguments:
@@ -839,6 +873,8 @@ public extension Syntax {
       return .unresolvedIsExpr(UnresolvedIsExprSyntax(self)!)
     case .unresolvedTernaryExpr:
       return .unresolvedTernaryExpr(UnresolvedTernaryExprSyntax(self)!)
+    case .unsafeExpr:
+      return .unsafeExpr(UnsafeExprSyntax(self)!)
     case .valueBindingPattern:
       return .valueBindingPattern(ValueBindingPatternSyntax(self)!)
     case .variableDecl:
@@ -895,9 +931,9 @@ public enum DeclSyntaxEnum {
   case variableDecl(VariableDeclSyntax)
 }
 
-public extension DeclSyntax {
+extension DeclSyntax {
   /// Get an enum that can be used to exhaustively switch over all Decl syntax nodes.
-  func `as`(_: DeclSyntaxEnum.Type) -> DeclSyntaxEnum {
+  public func `as`(_: DeclSyntaxEnum.Type) -> DeclSyntaxEnum {
     switch raw.kind {
     case .accessorDecl:
       return .accessorDecl(AccessorDeclSyntax(self)!)
@@ -963,8 +999,8 @@ public enum ExprSyntaxEnum {
   case binaryOperatorExpr(BinaryOperatorExprSyntax)
   case booleanLiteralExpr(BooleanLiteralExprSyntax)
   case borrowExpr(BorrowExprSyntax)
-  case canImportExpr(CanImportExprSyntax)
-  case canImportVersionInfo(CanImportVersionInfoSyntax)
+  case _canImportExpr(_CanImportExprSyntax)
+  case _canImportVersionInfo(_CanImportVersionInfoSyntax)
   case closureExpr(ClosureExprSyntax)
   case consumeExpr(ConsumeExprSyntax)
   case copyExpr(CopyExprSyntax)
@@ -1011,11 +1047,15 @@ public enum ExprSyntaxEnum {
   case unresolvedAsExpr(UnresolvedAsExprSyntax)
   case unresolvedIsExpr(UnresolvedIsExprSyntax)
   case unresolvedTernaryExpr(UnresolvedTernaryExprSyntax)
+  #if compiler(>=5.8)
+  @_spi(ExperimentalLanguageFeatures)
+  #endif
+  case unsafeExpr(UnsafeExprSyntax)
 }
 
-public extension ExprSyntax {
+extension ExprSyntax {
   /// Get an enum that can be used to exhaustively switch over all Expr syntax nodes.
-  func `as`(_: ExprSyntaxEnum.Type) -> ExprSyntaxEnum {
+  public func `as`(_: ExprSyntaxEnum.Type) -> ExprSyntaxEnum {
     switch raw.kind {
     case .arrayExpr:
       return .arrayExpr(ArrayExprSyntax(self)!)
@@ -1033,10 +1073,10 @@ public extension ExprSyntax {
       return .booleanLiteralExpr(BooleanLiteralExprSyntax(self)!)
     case .borrowExpr:
       return .borrowExpr(BorrowExprSyntax(self)!)
-    case .canImportExpr:
-      return .canImportExpr(CanImportExprSyntax(self)!)
-    case .canImportVersionInfo:
-      return .canImportVersionInfo(CanImportVersionInfoSyntax(self)!)
+    case ._canImportExpr:
+      return ._canImportExpr(_CanImportExprSyntax(self)!)
+    case ._canImportVersionInfo:
+      return ._canImportVersionInfo(_CanImportVersionInfoSyntax(self)!)
     case .closureExpr:
       return .closureExpr(ClosureExprSyntax(self)!)
     case .consumeExpr:
@@ -1123,6 +1163,8 @@ public extension ExprSyntax {
       return .unresolvedIsExpr(UnresolvedIsExprSyntax(self)!)
     case .unresolvedTernaryExpr:
       return .unresolvedTernaryExpr(UnresolvedTernaryExprSyntax(self)!)
+    case .unsafeExpr:
+      return .unsafeExpr(UnsafeExprSyntax(self)!)
     default:
       preconditionFailure("unknown Expr syntax kind")
     }
@@ -1140,9 +1182,9 @@ public enum PatternSyntaxEnum {
   case wildcardPattern(WildcardPatternSyntax)
 }
 
-public extension PatternSyntax {
+extension PatternSyntax {
   /// Get an enum that can be used to exhaustively switch over all Pattern syntax nodes.
-  func `as`(_: PatternSyntaxEnum.Type) -> PatternSyntaxEnum {
+  public func `as`(_: PatternSyntaxEnum.Type) -> PatternSyntaxEnum {
     switch raw.kind {
     case .expressionPattern:
       return .expressionPattern(ExpressionPatternSyntax(self)!)
@@ -1188,9 +1230,9 @@ public enum StmtSyntaxEnum {
   case yieldStmt(YieldStmtSyntax)
 }
 
-public extension StmtSyntax {
+extension StmtSyntax {
   /// Get an enum that can be used to exhaustively switch over all Stmt syntax nodes.
-  func `as`(_: StmtSyntaxEnum.Type) -> StmtSyntaxEnum {
+  public func `as`(_: StmtSyntaxEnum.Type) -> StmtSyntaxEnum {
     switch raw.kind {
     case .breakStmt:
       return .breakStmt(BreakStmtSyntax(self)!)
@@ -1254,9 +1296,9 @@ public enum TypeSyntaxEnum {
   case tupleType(TupleTypeSyntax)
 }
 
-public extension TypeSyntax {
+extension TypeSyntax {
   /// Get an enum that can be used to exhaustively switch over all Type syntax nodes.
-  func `as`(_: TypeSyntaxEnum.Type) -> TypeSyntaxEnum {
+  public func `as`(_: TypeSyntaxEnum.Type) -> TypeSyntaxEnum {
     switch raw.kind {
     case .arrayType:
       return .arrayType(ArrayTypeSyntax(self)!)

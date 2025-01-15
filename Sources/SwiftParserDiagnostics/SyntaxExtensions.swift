@@ -10,8 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if compiler(>=6)
+internal import SwiftBasicFormat
+@_spi(Diagnostics) internal import SwiftParser
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) internal import SwiftSyntax
+#else
+import SwiftBasicFormat
 @_spi(Diagnostics) import SwiftParser
-@_spi(RawSyntax) import SwiftSyntax
+@_spi(RawSyntax) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+#endif
 
 extension UnexpectedNodesSyntax {
   func presentTokens(satisfying isIncluded: (TokenSyntax) -> Bool) -> [TokenSyntax] {
@@ -99,7 +106,9 @@ extension SyntaxProtocol {
       } else {
         return "braces"
       }
-    } else if let token = Syntax(self).as(UnexpectedNodesSyntax.self)?.onlyPresentTokens(satisfying: { $0.tokenKind.isLexerClassifiedKeyword })?.only {
+    } else if let token = Syntax(self).as(UnexpectedNodesSyntax.self)?.onlyPresentTokens(satisfying: {
+      $0.tokenKind.isLexerClassifiedKeyword
+    })?.only {
       return "'\(token.text)' keyword"
     } else if let token = Syntax(self).as(TokenSyntax.self) {
       return "'\(token.text)' keyword"
@@ -110,24 +119,28 @@ extension SyntaxProtocol {
     }
   }
 
-  /// Returns this node or the first ancestor that satisfies `condition`.
-  func ancestorOrSelf<T>(mapping map: (Syntax) -> T?) -> T? {
-    var walk: Syntax? = Syntax(self)
-    while let unwrappedParent = walk {
-      if let mapped = map(unwrappedParent) {
-        return mapped
-      }
-      walk = unwrappedParent.parent
-    }
-    return nil
-  }
-
   /// Returns `true` if the next token's leading trivia should be made leading trivia
   /// of this mode, when it is switched from being missing to present.
   var shouldBeInsertedAfterNextTokenTrivia: Bool {
     if !self.raw.kind.isMissing,
       let memberDeclItem = self.ancestorOrSelf(mapping: { $0.as(MemberBlockItemSyntax.self) }),
       memberDeclItem.firstToken(viewMode: .all) == self.firstToken(viewMode: .all)
+    {
+      return true
+    } else {
+      return false
+    }
+  }
+
+  /// Returns `true` if the previous token and this node don't need to be separated,
+  /// when it is switched from being missing to present.
+  var shouldBeInsertedBeforePreviousTokenTrivia: Bool {
+    if let previousToken = self.previousToken(viewMode: .fixedUp),
+      previousToken.isPresent,
+      let firstToken = self.firstToken(viewMode: .all),
+      previousToken.trailingTrivia.allSatisfy({ $0.isWhitespace }),
+      !BasicFormat().requiresWhitespace(between: previousToken, and: firstToken),
+      !BasicFormat().requiresNewline(between: previousToken, and: firstToken)
     {
       return true
     } else {
@@ -174,7 +187,7 @@ extension TokenKind {
   }
 }
 
-public extension TriviaPiece {
+extension TriviaPiece {
   var isBackslash: Bool {
     switch self {
     case .backslashes: return true
@@ -190,5 +203,20 @@ extension TokenSyntax {
 
   var isPresent: Bool {
     return presence == .present
+  }
+}
+
+extension TypeSpecifierListSyntax {
+  var simpleSpecifiers: [TokenSyntax] {
+    return self.compactMap { specifier in
+      switch specifier {
+      case .simpleTypeSpecifier(let specifier): return specifier.specifier
+      case .lifetimeTypeSpecifier: return nil
+      #if RESILIENT_LIBRARIES
+      @unknown default:
+        fatalError()
+      #endif
+      }
+    }
   }
 }
